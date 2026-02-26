@@ -18,6 +18,14 @@ export const create = async (req, res, next) => {
     try {
         const { pacienteId } = req.params;
         const { id, pacienteId: _p, creadoEn, actualizadoEn, ...data } = req.body;
+        
+        // Map aliases from frontend
+        data.getSedentario = data.getSedentario ?? data.hbeSedentario;
+        data.getLeve = data.getLeve ?? data.hbeLeve;
+        data.getModerado = data.getModerado ?? data.hbeModerado;
+        data.getIntenso = data.getIntenso ?? data.hbeIntenso;
+        data.faoOmsRequerimiento = data.faoOmsRequerimiento ?? data.faoomsBase;
+
         const req_data = await prisma.requerimiento.create({
             data: {
                 ...data,
@@ -46,6 +54,14 @@ export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { id: _id, pacienteId, creadoEn, actualizadoEn, ...data } = req.body;
+
+        // Map aliases from frontend
+        data.getSedentario = data.getSedentario ?? data.hbeSedentario;
+        data.getLeve = data.getLeve ?? data.hbeLeve;
+        data.getModerado = data.getModerado ?? data.hbeModerado;
+        data.getIntenso = data.getIntenso ?? data.hbeIntenso;
+        data.faoOmsRequerimiento = data.faoOmsRequerimiento ?? data.faoomsBase;
+
         const updated = await prisma.requerimiento.update({
             where: { id },
             data

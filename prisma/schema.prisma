@@ -11,10 +11,11 @@ model Paciente {
   id                   String    @id @default(uuid())
   nombre               String
   apellido             String?
-  telefono             String    @unique
+  telefono             String?   @unique
   email                String?
   fechaNacimiento      DateTime  @map("fecha_nacimiento") @db.Date
   sexo                 String
+  estatura             Decimal?  @db.Decimal(12, 4)
   complexion           Decimal?  @db.Decimal(5, 2)
   fechaRegistro        DateTime  @default(now()) @map("fecha_registro")
   nivelMembresia       String    @default("ninguna") @map("nivel_membresia")
@@ -38,12 +39,13 @@ model DatosEjercicio {
   id                   String  @id @default(uuid())
   pacienteId           String  @unique @map("paciente_id")
   objetivo             String?
-  gymDeOrigen          String? @map("gym_de_origen")
+  gymOrigen            String? @map("gym_origen")
   disciplina           String?
   horaEntrenamiento    String? @map("hora_entrenamiento")
   frecuencia           String?
-  tiempoDuracion       String? @map("tiempo_duracion")
+  tiempo               String?
   detallesAdicionales  String? @map("detalles_adicionales")
+  nivelActividad       String? @map("nivel_actividad")
   porcentajeSedentario Int     @default(10) @map("porcentaje_sedentario")
   porcentajeLeve       Int     @default(20) @map("porcentaje_leve")
   porcentajeModerado   Int     @default(30) @map("porcentaje_moderado")
@@ -80,21 +82,21 @@ model ConsumoCalorico {
 }
 
 model Antecedentes {
-  id                          String  @id @default(uuid())
-  pacienteId                  String  @unique @map("paciente_id")
-  alimentosNoGusta            String? @map("alimentos_no_gusta")
-  alimentosGusta              String? @map("alimentos_gusta")
-  alergicoA                   String? @map("alergico_a")
-  patologia                   String?
-  cirugias                    String?
-  estrenimiento               Boolean @default(false)
-  consumoAlcohol              Boolean @default(false) @map("consumo_alcohol")
-  tabaco                      Boolean @default(false)
-  consumoAgua                 String? @map("consumo_agua")
-  cicloMenstrual              String? @map("ciclo_menstrual")
-  signosSintomas              String? @map("signos_sintomas")
-  suplementacionHistorial     String? @map("suplementacion_historial")
-  suplementacionRecomendacion String? @map("suplementacion_recomendacion")
+  id                       String  @id @default(uuid())
+  pacienteId               String  @unique @map("paciente_id")
+  alimentosNoGustan        String? @map("alimentos_no_gustan")
+  alimentosGustan          String? @map("alimentos_gustan")
+  alergias                 String?
+  patologia                String?
+  cirugias                 String?
+  estrenimiento            String?
+  consumoAlcohol           String? @map("consumo_alcohol")
+  tabaco                   String?
+  agua                     String? @map("agua")
+  cicloMenstrual           String? @map("ciclo_menstrual")
+  signosYSintomas          String? @map("signos_y_sintomas")
+  historialProductos       String? @map("historial_productos")
+  recomendacionSuplementos String? @map("recomendacion_suplementos")
 
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
@@ -106,10 +108,11 @@ model Valoracion {
   pacienteId              String   @map("paciente_id")
   fecha                   DateTime @default(now()) @db.Date
   hora                    String?
-  medicionNumero          Int?     @map("medicion_numero")
-  peso                    Decimal  @db.Decimal(12, 4)
-  talla                   Decimal  @db.Decimal(12, 4)
+  numeroValoracion        Int?     @map("numero_valoracion")
+  pesoActual              Decimal  @map("peso_actual") @db.Decimal(12, 4)
+  estatura                Decimal  @map("estatura") @db.Decimal(12, 4)
   imc                     Decimal? @db.Decimal(12, 4)
+  clasificacionImc        String?  @map("clasificacion_imc")
   // Pliegues
   pliegeTricep            Decimal? @map("pliegue_tricep") @db.Decimal(12, 4)
   pliegeBicep             Decimal? @map("pliegue_bicep") @db.Decimal(12, 4)
@@ -138,26 +141,28 @@ model Valoracion {
   diametroBiepicondHumero Decimal? @map("diametro_biepicondilo_humero") @db.Decimal(12, 4)
   diametroBiepicondFemur  Decimal? @map("diametro_biepicondilo_femur") @db.Decimal(12, 4)
   // Bioimpedancia
-  bioimpedanciaPctGrasa   Decimal? @map("bioimpedancia_porcentaje_grasa") @db.Decimal(12, 4)
-  bioimpedanciaPctAgua    Decimal? @map("bioimpedancia_porcentaje_agua") @db.Decimal(12, 4)
-  bioimpedanciaKgMusculo  Decimal? @map("bioimpedancia_kg_musculo") @db.Decimal(12, 4)
-  bioimpedanciaEnergia    Decimal? @map("bioimpedancia_energia") @db.Decimal(12, 4)
+  bioGrasa                Decimal? @map("bio_grasa") @db.Decimal(12, 4)
+  bioAgua                 Decimal? @map("bio_agua") @db.Decimal(12, 4)
+  bioMusculo              Decimal? @map("bio_musculo") @db.Decimal(12, 4)
+  bioEnergia              Decimal? @map("bio_energia") @db.Decimal(12, 4)
   // Bioquímicos
-  bioquimicoGlucosa       Decimal? @map("bioquimico_glucosa") @db.Decimal(12, 4)
-  bioquimicoTrigliceridos Decimal? @map("bioquimico_trigliceridos") @db.Decimal(12, 4)
-  bioquimicoColesterol    Decimal? @map("bioquimico_colesterol") @db.Decimal(12, 4)
-  bioquimicoCreatinina    Decimal? @map("bioquimico_creatinina") @db.Decimal(12, 4)
-  bioquimicoAcidoUrico    Decimal? @map("bioquimico_acido_urico") @db.Decimal(12, 4)
+  glucosa                 Decimal? @map("glucosa") @db.Decimal(12, 4)
+  trigliceridos           Decimal? @map("trigliceridos") @db.Decimal(12, 4)
+  colesterol              Decimal? @map("colesterol") @db.Decimal(12, 4)
+  creatinina              Decimal? @map("creatinina") @db.Decimal(12, 4)
+  acidoUrico              Decimal? @map("acido_urico") @db.Decimal(12, 4)
   // Signos vitales
-  frecuenciaCardiaca      Int?     @map("frecuencia_cardiaca")
-  presionArterial         String?  @map("presion_arterial")
+  frecuenciaCardiaca      Int?     @map("frecuencia_cardiaca") // opcional/no payload
+  presionArterial         String?  @map("presion_arterial") // opcional/no payload
   // 2 Componentes
   pctGrasa2comp           Decimal? @map("porcentaje_grasa_2comp") @db.Decimal(12, 4)
   kgGrasa2comp            Decimal? @map("kg_grasa_2comp") @db.Decimal(12, 4)
   kgMasaMagra2comp        Decimal? @map("kg_masa_magra_2comp") @db.Decimal(12, 4)
   // 4 Componentes
-  superficieCorporal      Decimal? @map("superficie_corporal") @db.Decimal(12, 4)
-  pctGrasaCorporal4comp   Decimal? @map("porcentaje_grasa_corporal_4comp") @db.Decimal(12, 4)
+  superficieCorporal      Decimal? @map("superficie_corporal") @db.Decimal(12, 4) // legacy
+  superficieCorp          Decimal? @map("superficie_corp") @db.Decimal(12, 4)
+  pctGrasaCorporal4comp   Decimal? @map("porcentaje_grasa_corporal_4comp") @db.Decimal(12, 4) // legacy
+  pctGrasaCorp            Decimal? @map("porcentaje_grasa_corp") @db.Decimal(12, 4)
   masaGrasaReal           Decimal? @map("masa_grasa_real") @db.Decimal(12, 4)
   pctGrasaIdeal           Decimal? @map("porcentaje_grasa_ideal") @db.Decimal(12, 4)
   masaGrasaIdeal          Decimal? @map("masa_grasa_ideal") @db.Decimal(12, 4)
@@ -171,11 +176,12 @@ model Valoracion {
   pctMusculoIdeal         Decimal? @map("porcentaje_musculo_ideal") @db.Decimal(12, 4)
   musculoIdeal            Decimal? @map("musculo_ideal") @db.Decimal(12, 4)
   masaMagra               Decimal? @map("masa_magra") @db.Decimal(12, 4)
-  deficitMuscular         Decimal? @map("deficit_muscular") @db.Decimal(12, 4)
+  deficitMusculo          Decimal? @map("deficit_musculo") @db.Decimal(12, 4)
   deficitCalorico         Decimal? @map("deficit_calorico") @db.Decimal(12, 4)
   pesoIdeal               Decimal? @map("peso_ideal") @db.Decimal(12, 4)
-  pesoTeoricoMin          Decimal? @map("peso_teorico_min") @db.Decimal(12, 4)
-  pesoTeoricoMax          Decimal? @map("peso_teorico_max") @db.Decimal(12, 4)
+  pesoIdeal4comp          Decimal? @map("peso_ideal_4comp") @db.Decimal(12, 4)
+  ptMin                   Decimal? @map("pt_min") @db.Decimal(12, 4)
+  ptMax                   Decimal? @map("pt_max") @db.Decimal(12, 4)
   pesoAjustado            Decimal? @map("peso_ajustado") @db.Decimal(12, 4)
   sobrepeso               Decimal? @db.Decimal(12, 4)
   indiceProporcionalidad  Decimal? @map("indice_proporcionalidad") @db.Decimal(12, 4)
@@ -193,9 +199,10 @@ model Valoracion {
   tipoDietaCompetencia    String?  @map("tipo_dieta_competencia")
   // Bioimpedancia extra / Otros
   densidad2comp           Decimal? @map("densidad_2comp") @db.Decimal(12, 4)
+  edadMetabolica          Decimal? @map("edad_metabolica") @db.Decimal(12, 4)
   // Notas
   comentarios             String?
-  suplementacionProductos String?  @map("suplementacion_productos")
+  suplementacion          String?  @map("suplementacion")
   createdAt               DateTime @default(now()) @map("created_at")
 
   paciente        Paciente          @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -339,60 +346,76 @@ model Requerimiento {
   fecha        DateTime @default(now())
 
   // Base
-  peso  Float
-  talla Float
-  edad  Int
-  sexo  String
+  peso  Decimal? @db.Decimal(12, 4)
+  talla Decimal? @db.Decimal(12, 4)
+  edad  Int?
+  sexo  String?
 
   // Energético
-  formulaTmb      String @map("formula_tmb")
-  factorActividad Float  @map("factor_actividad")
-  tmb             Float
-  get             Float
-  ger             Float?
-  eta             Float?
-  af              Float?
-  deporte         Float?
-  gct             Float?
+  nivelActividad  String?  @map("nivel_actividad")
+  formulaTmb      String?  @map("formula_tmb")
+  factorActividad Decimal? @map("factor_actividad") @db.Decimal(12, 4)
+  tmb             Decimal? @db.Decimal(12, 4)
+  get             Decimal? @db.Decimal(12, 4)
+  ger             Decimal? @db.Decimal(12, 4)
+  eta             Decimal? @db.Decimal(12, 4)
+  af              Decimal? @db.Decimal(12, 4)
+  deporte         Decimal? @db.Decimal(12, 4)
+  gct             Decimal? @db.Decimal(12, 4)
+
+  // Harris-Benedict completo
+  getSedentario   Decimal? @map("get_sedentario") @db.Decimal(12, 4)
+  getLeve         Decimal? @map("get_leve") @db.Decimal(12, 4)
+  getModerado     Decimal? @map("get_moderado") @db.Decimal(12, 4)
+  getIntenso      Decimal? @map("get_intenso") @db.Decimal(12, 4)
+  getSeleccionado Decimal? @map("get_seleccionado") @db.Decimal(12, 4)
+
+  // FAO/OMS
+  faoOmsRequerimiento Decimal? @map("fao_oms_requerimiento") @db.Decimal(12, 4)
+
+  // Cálculo rápido
+  calcRapidoObeso        Decimal? @map("calc_rapido_obeso") @db.Decimal(12, 4)
+  calcRapidoNormal       Decimal? @map("calc_rapido_normal") @db.Decimal(12, 4)
+  calcRapidoDesnutricion Decimal? @map("calc_rapido_desnutricion") @db.Decimal(12, 4)
 
   // Macros %
-  pctProteinas Float? @map("pct_proteinas")
-  pctCarbs     Float? @map("pct_carbs")
-  pctLipidos   Float? @map("pct_lipidos")
+  pctProteinas Decimal? @map("pct_proteinas") @db.Decimal(12, 4)
+  pctCarbs     Decimal? @map("pct_carbs") @db.Decimal(12, 4)
+  pctLipidos   Decimal? @map("pct_lipidos") @db.Decimal(12, 4)
 
   // Macros kcal
-  kcalProteinas Float? @map("kcal_proteinas")
-  kcalCarbs     Float? @map("kcal_carbs")
-  kcalLipidos   Float? @map("kcal_lipidos")
+  kcalProteinas Decimal? @map("kcal_proteinas") @db.Decimal(12, 4)
+  kcalCarbs     Decimal? @map("kcal_carbs") @db.Decimal(12, 4)
+  kcalLipidos   Decimal? @map("kcal_lipidos") @db.Decimal(12, 4)
 
   // Macros gramos
-  grProteinas Float? @map("gr_proteinas")
-  grCarbs     Float? @map("gr_carbs")
-  grLipidos   Float? @map("gr_lipidos")
+  grProteinas Decimal? @map("gr_proteinas") @db.Decimal(12, 4)
+  grCarbs     Decimal? @map("gr_carbs") @db.Decimal(12, 4)
+  grLipidos   Decimal? @map("gr_lipidos") @db.Decimal(12, 4)
 
   // Macros gr/kg
-  grKgProteinas Float? @map("gr_kg_proteinas")
-  grKgCarbs     Float? @map("gr_kg_carbs")
-  grKgLipidos   Float? @map("gr_kg_lipidos")
+  grKgProteinas Decimal? @map("gr_kg_proteinas") @db.Decimal(12, 4)
+  grKgCarbs     Decimal? @map("gr_kg_carbs") @db.Decimal(12, 4)
+  grKgLipidos   Decimal? @map("gr_kg_lipidos") @db.Decimal(12, 4)
 
   // Equivalentes por grupo
-  eqVerduras     Float? @map("eq_verduras")
-  eqFrutas       Float? @map("eq_frutas")
-  eqCerealSinGr  Float? @map("eq_cereal_sin_gr")
-  eqCerealConGr  Float? @map("eq_cereal_con_gr")
-  eqLeguminosas  Float? @map("eq_leguminosas")
-  eqAoaMuyBajo   Float? @map("eq_aoa_muy_bajo")
-  eqAoaBajo      Float? @map("eq_aoa_bajo")
-  eqAoaModerado  Float? @map("eq_aoa_moderado")
-  eqAoaAlto      Float? @map("eq_aoa_alto")
-  eqLecheDesc    Float? @map("eq_leche_desc")
-  eqLecheSemi    Float? @map("eq_leche_semi")
-  eqLecheEntera  Float? @map("eq_leche_entera")
-  eqLecheAz      Float? @map("eq_leche_az")
-  eqGrasaSinProt Float? @map("eq_grasa_sin_prot")
-  eqGrasaConProt Float? @map("eq_grasa_con_prot")
-  eqAzSinGr      Float? @map("eq_az_sin_gr")
-  eqAzConGr      Float? @map("eq_az_con_gr")
+  eqVerduras     Decimal? @map("eq_verduras") @db.Decimal(12, 4)
+  eqFrutas       Decimal? @map("eq_frutas") @db.Decimal(12, 4)
+  eqCerealSinGr  Decimal? @map("eq_cereal_sin_gr") @db.Decimal(12, 4)
+  eqCerealConGr  Decimal? @map("eq_cereal_con_gr") @db.Decimal(12, 4)
+  eqLeguminosas  Decimal? @map("eq_leguminosas") @db.Decimal(12, 4)
+  eqAoaMuyBajo   Decimal? @map("eq_aoa_muy_bajo") @db.Decimal(12, 4)
+  eqAoaBajo      Decimal? @map("eq_aoa_bajo") @db.Decimal(12, 4)
+  eqAoaModerado  Decimal? @map("eq_aoa_moderado") @db.Decimal(12, 4)
+  eqAoaAlto      Decimal? @map("eq_aoa_alto") @db.Decimal(12, 4)
+  eqLecheDesc    Decimal? @map("eq_leche_desc") @db.Decimal(12, 4)
+  eqLecheSemi    Decimal? @map("eq_leche_semi") @db.Decimal(12, 4)
+  eqLecheEntera  Decimal? @map("eq_leche_entera") @db.Decimal(12, 4)
+  eqLecheAz      Decimal? @map("eq_leche_az") @db.Decimal(12, 4)
+  eqGrasaSinProt Decimal? @map("eq_grasa_sin_prot") @db.Decimal(12, 4)
+  eqGrasaConProt Decimal? @map("eq_grasa_con_prot") @db.Decimal(12, 4)
+  eqAzSinGr      Decimal? @map("eq_az_sin_gr") @db.Decimal(12, 4)
+  eqAzConGr      Decimal? @map("eq_az_con_gr") @db.Decimal(12, 4)
 
   // Distribución por tiempo de comida (JSON serializado)
   distribucionJson String? @map("distribucion_json")
@@ -407,18 +430,19 @@ model Requerimiento {
 }
 
 model Configuracion {
-  id            String   @id @default("singleton")
-  nombre        String?
-  cedula        String?
-  universidad   String?
-  profesion     String?
-  certificacion String?
-  telefono      String?
-  email         String?
-  direccion     String?
-  logoUrl       String?  @map("logo_url")
-  firmaUrl      String?  @map("firma_url")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id                String   @id @default("singleton")
+  nombre            String?
+  cedula            String?
+  universidad       String?
+  profesion         String?
+  certificacion     String?
+  telefono          String?
+  email             String?
+  direccion         String?
+  logoUrl           String?  @map("logo_url")
+  firmaUrl          String?  @map("firma_url")
+  googleCalendarUrl String?  @map("google_calendar_url")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("configuracion")
 }

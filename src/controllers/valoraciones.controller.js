@@ -8,13 +8,26 @@ export const getAll = async (req, res, next) => {
             where: { pacienteId },
             include: { 
                 temarioConsulta: true,
-                planes: { take: 1, orderBy: { fechaCreacion: 'desc' } }
+                planes: {
+                    select: {
+                        id: true,
+                        tipoPlan: true,
+                        estado: true,
+                        fechaCreacion: true
+                    },
+                    orderBy: { fechaCreacion: 'desc' }
+                }
             },
             orderBy: { fecha: 'desc' }
         });
+
         return ok(res, valoraciones.map(v => {
             const { planes, ...rest } = v;
-            return { ...rest, plan: planes[0] || null };
+            return { 
+                ...rest, 
+                plan: planes[0] || null,
+                planId: planes[0]?.id || null // Added for explicit frontend detection
+            };
         }));
     } catch (err) {
         next(err);
@@ -25,115 +38,106 @@ export const create = async (req, res, next) => {
     try {
         const { pacienteId } = req.params;
         
-        // Medicion Numero logic stays in backend
-        const ultimaMedicion = await prisma.valoracion.findFirst({
+        const ultimaVal = await prisma.valoracion.findFirst({
             where: { pacienteId },
-            orderBy: { medicionNumero: 'desc' }
+            orderBy: { numeroValoracion: 'desc' }
         });
-        const medicionNumero = (ultimaMedicion?.medicionNumero || 0) + 1;
+        const numeroValoracion = (ultimaVal?.numeroValoracion || 0) + 1;
 
         const { 
-            id,
-            temario,
-            temarioConsulta, 
-            composicion, 
-            pliegues, 
-            perimetros, 
-            diametros, 
-            bioimpedancia, 
-            bioquimicos, 
-            signosVitales,
-            suplementacion,
-            medicionNumero: _m,
-            createdAt,
-            updatedAt,
-            ...vData 
+            id: _, 
+            pacienteId: __,
+            temario, temarioConsulta,
+            pliegues, perimetros,
+            diametros, bioimpedancia, bioquimicos,
+            // Aliases & calculated fields to exclude from top-level spread
+            peso, deficitMuscular, talla,
+            brazoCor, piernaCor, pantoCor,
+            pesoTeoricoMin, pesoTeoricoMax,
+            tmb, getSedentario, getLeve, getModerado, getIntenso,
+            faoOmsRequerimiento, calcRapidoNormal, calcRapidoObeso, calcRapidoDesnutricion,
+            tallaMin, tallaMax, resultadoImc, resultadoImic,
+            createdAt, updatedAt,
+            ...rest 
         } = req.body;
 
-        // Map composicion
-        if (composicion) {
-            if (composicion.pctGrasa !== undefined) vData.pctGrasa2comp = composicion.pctGrasa;
-            if (composicion.kgGrasa !== undefined) vData.kgGrasa2comp = composicion.kgGrasa;
-            if (composicion.kgMagra !== undefined) vData.kgMasaMagra2comp = composicion.kgMagra;
-        }
+        const vData = { 
+            ...rest,
+            pesoActual: rest.pesoActual ?? (peso ? parseFloat(peso) : undefined),
+            deficitMusculo: rest.deficitMusculo ?? deficitMuscular,
+            estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined)
+        };
 
-        // Map pliegues (Accents and names from frontend)
+        // Pliegues
         if (pliegues) {
-            const p = pliegues;
-            vData.pliegeTricep = p['Trícep'] ?? p['Tricep'] ?? p['tricep'];
-            vData.pliegeBicep = p['Bícep'] ?? p['Bicep'] ?? p['bicep'];
-            vData.pliegueSubescapular = p['Subescapular'] ?? p['subescapular'];
-            vData.pliegueCrestaIliaca = p['Cresta Ilíaca'] ?? p['Cresta Iliaca'] ?? p['cresta_iliaca'];
-            vData.pliegueSupraespinal = p['Supraespinal'] ?? p['supraespinal'];
-            vData.pliegueAbdominal = p['Abdominal'] ?? p['abdominal'];
-            vData.pliegueMusloFrontal = p['Muslo'] ?? p['Muslo Frontal'] ?? p['muslo_frontal'];
-            vData.plieguePantorrilla = p['Pantorrilla'] ?? p['pantorrilla'];
+            vData.pliegeTricep = pliegues.tricep;
+            vData.pliegeBicep = pliegues.bicep;
+            vData.pliegueSubescapular = pliegues.subescapular;
+            vData.pliegueCrestaIliaca = pliegues.crestaIliaca;
+            vData.pliegueSupraespinal = pliegues.supraespinal;
+            vData.pliegueAbdominal = pliegues.abdominal;
+            vData.pliegueMusloFrontal = pliegues.musloFrontal;
+            vData.plieguePantorrilla = pliegues.pantorrilla;
         }
 
-        // Map perimetros
+        // Perimetros
         if (perimetros) {
-            const p = perimetros;
-            vData.perimetroMuneca = p['Muñeca'] ?? p['Muneca'] ?? p['muneca'];
-            vData.perimetroBrazoRelajado = p['Brazo'] ?? p['Brazo Relajado'] ?? p['brazo_relajado'];
-            vData.perimetroBrazoContraido = p['Brazo Contraído'] ?? p['Brazo Contraido'] ?? p['brazo_contraido'];
-            vData.perimetroPectoral = p['Pectoral'] ?? p['pectoral'];
-            vData.perimetroCintura = p['Cintura'] ?? p['cintura'];
-            vData.perimetroAbdomen = p['Abdomen'] ?? p['abdomen'];
-            vData.perimetroCadera = p['Cadera'] ?? p['cadera'];
-            vData.perimetroMusloFrontal = p['Muslo'] ?? p['Muslo Frontal'] ?? p['muslo_frontal'];
-            vData.perimetroPantorrilla = p['Pantorrilla'] ?? p['pantorrilla'];
+            vData.perimetroMuneca = perimetros.muneca;
+            vData.perimetroBrazoRelajado = perimetros.brazoRelajado;
+            vData.perimetroBrazoContraido = perimetros.brazoContraido;
+            vData.perimetroPectoral = perimetros.pectoral;
+            vData.perimetroCintura = perimetros.cintura;
+            vData.perimetroAbdomen = perimetros.abdomen;
+            vData.perimetroCadera = perimetros.cadera;
+            vData.perimetroMusloFrontal = perimetros.musloFrontal;
+            vData.perimetroPantorrilla = perimetros.pantorrilla;
+            vData.brazoCorregido = perimetros.brazoCor;
+            vData.piernaCorregida = perimetros.piernaCor;
+            vData.pantorrillaCorregida = perimetros.pantoCor;
         }
 
-        // Map diametros
+        // Diametros
         if (diametros) {
-            const d = diametros;
-            vData.diametroBiestiloideo = d['Biestiloideo'] ?? d['Biestiloideo (Muñeca)'] ?? d['biestiloideo'];
-            vData.diametroBiepicondHumero = d['Biepicondíleo Húmero'] ?? d['Biepicondilo Humero'] ?? d['Biepicondilar Húmero'] ?? d['biepicondilo_humero'];
-            vData.diametroBiepicondFemur = d['Biepicondíleo Fémur'] ?? d['Biepicondilo Femur'] ?? d['Biepicondilar Fémur'] ?? d['biepicondilo_femur'];
+            vData.diametroBiestiloideo = diametros["Biestiloideo (Muñeca)"];
+            vData.diametroBiepicondHumero = diametros["Biepicondilar Húmero"];
+            vData.diametroBiepicondFemur = diametros["Biepicondilar Fémur"];
         }
 
-        // Map bioimpedancia
+        // Bioimpedancia mappings (ensure numbers)
         if (bioimpedancia) {
-            const b = bioimpedancia;
-            vData.bioimpedanciaPctGrasa = b['% Grasa'] ?? b['porcentaje_grasa'];
-            vData.bioimpedanciaPctAgua = b['% Agua'] ?? b['porcentaje_agua'];
-            vData.bioimpedanciaKgMusculo = b['Kg Músculo'] ?? b['Kg Musculo'] ?? b['kg_musculo'];
-            vData.bioimpedanciaEnergia = b['Energía'] ?? b['Energia'] ?? b['energia'];
+            vData.bioGrasa = bioimpedancia["Grasa %"] ? parseFloat(bioimpedancia["Grasa %"]) : undefined;
+            vData.bioMusculo = bioimpedancia["Músculo %"] ? parseFloat(bioimpedancia["Músculo %"]) : undefined;
+            vData.bioAgua = bioimpedancia["Agua %"] ? parseFloat(bioimpedancia["Agua %"]) : undefined;
+            vData.masaVisceral = bioimpedancia["Grasa Visceral"] ? parseFloat(bioimpedancia["Grasa Visceral"]) : undefined;
+            vData.edadMetabolica = bioimpedancia["Edad Metabólica"] ? parseFloat(bioimpedancia["Edad Metabólica"]) : undefined;
         }
 
-        // Map bioquimicos
+        // Bioquimicos mappings (ensure numbers)
         if (bioquimicos) {
-            const b = bioquimicos;
-            if (b.Glu) vData.bioquimicoGlucosa = parseFloat(b.Glu);
-            if (b.Tag || b.Tri) vData.bioquimicoTrigliceridos = parseFloat(b.Tag || b.Tri);
-            if (b.Col) vData.bioquimicoColesterol = parseFloat(b.Col);
-            if (b.Creat) vData.bioquimicoCreatinina = parseFloat(b.Creat);
-            if (b.Urico) vData.bioquimicoAcidoUrico = parseFloat(b.Urico);
+            vData.trigliceridos = bioquimicos.Tag ? parseFloat(bioquimicos.Tag) : undefined;
+            vData.glucosa = bioquimicos.Glu ? parseFloat(bioquimicos.Glu) : undefined;
+            vData.colesterol = bioquimicos.Col ? parseFloat(bioquimicos.Col) : undefined;
+            vData.acidoUrico = bioquimicos.Urico ? parseFloat(bioquimicos.Urico) : undefined;
+            vData.creatinina = bioquimicos.Creat ? parseFloat(bioquimicos.Creat) : undefined;
         }
 
-        // Map signosVitales
-        if (signosVitales) {
-            if (signosVitales.fc) vData.frecuenciaCardiaca = parseInt(signosVitales.fc);
-            if (signosVitales.pa) vData.presionArterial = signosVitales.pa;
-        }
-
-        // Map suplementacion
-        if (suplementacion !== undefined) vData.suplementacionProductos = String(suplementacion);
-
-        // Crear Valoración with all data mapped
+        // Create
         const valoracion = await prisma.valoracion.create({
             data: {
                 ...vData,
                 pacienteId,
-                medicionNumero,
+                numeroValoracion,
                 fecha: req.body.fecha ? new Date(req.body.fecha) : new Date(),
-                temarioConsulta: temarioConsulta ? {
-                    create: temarioConsulta.map(t => ({
-                        pacienteId,
-                        tema: t.tema,
-                        detalle: t.detalle,
-                        orden: t.orden
-                    }))
+                hora: req.body.hora || new Date().toLocaleTimeString('en-US', { hour12: false }),
+                temarioConsulta: (temario || temarioConsulta) ? {
+                    create: (temario || temarioConsulta)
+                        .filter(t => t.tema || t.detalle)
+                        .map(t => ({
+                            pacienteId,
+                            tema: t.tema || 'Consulta General',
+                            detalle: t.detalle,
+                            orden: t.orden
+                        }))
                 } : undefined
             }
         });
@@ -250,75 +254,59 @@ export const update = async (req, res, next) => {
         const { id } = req.params;
         const { 
             id: _id,
-            temario,
-            temarioConsulta, 
-            composicion, 
-            pliegues, 
-            perimetros, 
-            diametros, 
-            bioimpedancia, 
-            bioquimicos, 
-            signosVitales,
-            suplementacion,
-            medicionNumero: _m,
-            createdAt,
-            updatedAt,
-            ...vData 
+            temario, temarioConsulta,
+            pliegues, perimetros,
+            // Bio
+            bioGrasa, bioAgua, bioMusculo, bioEnergia,
+            // Bioq
+            glucosa, trigliceridos, colesterol, creatinina, acidoUrico,
+            // Aliases
+            deficitMuscular, talla,
+            createdAt, updatedAt,
+            ...rest 
         } = req.body;
 
-        if (composicion) {
-            vData.pctGrasa2comp = composicion.pctGrasa;
-            vData.kgGrasa2comp = composicion.kgGrasa;
-            vData.kgMasaMagra2comp = composicion.kgMagra;
-        }
+        const vData = { ...rest };
+        if (deficitMuscular) vData.deficitMusculo = deficitMuscular;
+        if (talla) vData.estatura = talla;
 
+        // Pliegues
         if (pliegues) {
-            vData.pliegeTricep = pliegues['Trícep'] || pliegues['Tricep'];
-            vData.pliegeBicep = pliegues['Bícep'] || pliegues['Bicep'];
-            vData.pliegueSubescapular = pliegues['Subescapular'];
-            vData.pliegueCrestaIliaca = pliegues['Cresta Ilíaca'] || pliegues['Cresta Iliaca'];
-            vData.pliegueSupraespinal = pliegues['Supraespinal'];
-            vData.pliegueAbdominal = pliegues['Abdominal'];
-            vData.pliegueMusloFrontal = pliegues['Muslo'] || pliegues['Muslo Frontal'];
-            vData.plieguePantorrilla = pliegues['Pantorrilla'];
+            vData.pliegeTricep = pliegues.tricep;
+            vData.pliegeBicep = pliegues.bicep;
+            vData.pliegueSubescapular = pliegues.subescapular;
+            vData.pliegueCrestaIliaca = pliegues.crestaIliaca;
+            vData.pliegueSupraespinal = pliegues.supraespinal;
+            vData.pliegueAbdominal = pliegues.abdominal;
+            vData.pliegueMusloFrontal = pliegues.musloFrontal;
+            vData.plieguePantorrilla = pliegues.pantorrilla;
         }
 
+        // Perimetros
         if (perimetros) {
-            vData.perimetroMuneca = perimetros['Muñeca'] || perimetros['Muneca'];
-            vData.perimetroBrazoRelajado = perimetros['Brazo'] || perimetros['Brazo Relajado'];
-            vData.perimetroBrazoContraido = perimetros['Brazo Contraído'] || perimetros['Brazo Contraido'];
-            vData.perimetroCintura = perimetros['Cintura'];
-            vData.perimetroAbdomen = perimetros['Abdomen'];
-            vData.perimetroCadera = perimetros['Cadera'];
-            vData.perimetroMusloFrontal = perimetros['Muslo'] || perimetros['Muslo Frontal'];
-            vData.perimetroPantorrilla = perimetros['Pantorrilla'];
+            vData.perimetroMuneca = perimetros.muneca;
+            vData.perimetroBrazoRelajado = perimetros.brazoRelajado;
+            vData.perimetroBrazoContraido = perimetros.brazoContraido;
+            vData.perimetroPectoral = perimetros.pectoral;
+            vData.perimetroCintura = perimetros.cintura;
+            vData.perimetroAbdomen = perimetros.abdomen;
+            vData.perimetroCadera = perimetros.cadera;
+            vData.perimetroMusloFrontal = perimetros.musloFrontal;
+            vData.perimetroPantorrilla = perimetros.pantorrilla;
+            vData.brazoCorregido = perimetros.brazoCor;
+            vData.piernaCorregida = perimetros.piernaCor;
         }
 
-        if (diametros) {
-            vData.diametroBiestiloideo = diametros['Biestiloideo'];
-            vData.diametroBiepicondHumero = diametros['Biepicondíleo Húmero'] || diametros['Biepicondilo Humero'];
-            vData.diametroBiepicondFemur = diametros['Biepicondíleo Fémur'] || diametros['Biepicondilo Femur'];
-        }
-
-        if (bioimpedancia) {
-            vData.bioimpedanciaPctGrasa = bioimpedancia['% Grasa'];
-            vData.bioimpedanciaPctAgua = bioimpedancia['% Agua'];
-            vData.bioimpedanciaKgMusculo = bioimpedancia['Kg Músculo'] || bioimpedancia['Kg Musculo'];
-            vData.bioimpedanciaEnergia = bioimpedancia['Energía'] || bioimpedancia['Energia'];
-        }
-
-        if (bioquimicos) {
-            if (bioquimicos.Glu) vData.bioquimicoGlucosa = parseFloat(bioquimicos.Glu);
-            if (bioquimicos.Tri) vData.bioquimicoTrigliceridos = parseFloat(bioquimicos.Tri);
-            if (bioquimicos.Col) vData.bioquimicoColesterol = parseFloat(bioquimicos.Col);
-        }
-
-        if (signosVitales) {
-            if (signosVitales.fc && signosVitales.fc !== "") vData.frecuenciaCardiaca = parseInt(signosVitales.fc);
-            if (signosVitales.pa) vData.presionArterial = signosVitales.pa;
-        }
-
-        if (suplementacion) vData.suplementacionProductos = suplementacion;
+        // Bio & Bioq
+        vData.bioGrasa = bioGrasa ?? vData.bioGrasa;
+        vData.bioAgua = bioAgua ?? vData.bioAgua;
+        vData.bioMusculo = bioMusculo ?? vData.bioMusculo;
+        vData.bioEnergia = bioEnergia ?? vData.bioEnergia;
+        vData.glucosa = glucosa ?? vData.glucosa;
+        vData.trigliceridos = trigliceridos ?? vData.trigliceridos;
+        vData.colesterol = colesterol ?? vData.colesterol;
+        vData.creatinina = creatinina ?? vData.creatinina;
+        vData.acidoUrico = acidoUrico ?? vData.acidoUrico;
 
         const updated = await prisma.valoracion.update({
             where: { id },
