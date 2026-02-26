@@ -144,44 +144,80 @@ export const getAlertas = async (req, res, next) => {
                 valoraciones: {
                     orderBy: { fecha: 'desc' },
                     take: 1,
-                    select: { fecha: true, deficitMusculo: true }
+                    select: { id: true, fecha: true, deficitMusculo: true, createdAt: true }
+                },
+                planes: {
+                    orderBy: { fechaCreacion: 'desc' },
+                    take: 1,
+                    select: { valoracionId: true, estadoEnvio: true, nombre: true, fechaCreacion: true }
                 }
             }
         });
-
+ 
         const alertas = pacientes.map(p => {
             const ultV = p.valoraciones[0];
+            const ultP = p.planes[0];
             const diasSinVisita = ultV ? Math.floor(Math.abs(ahora - new Date(ultV.fecha)) / (1000 * 60 * 60 * 24)) : 999;
             
             let tipoRiesgo = 'Ninguno';
             let prioridad = 'Baja';
-
-            if (diasSinVisita > 45) {
-                tipoRiesgo = 'Abandono';
-                prioridad = 'Media';
+            let fechaReferencia = ultV ? ultV.fecha : null;
+ 
+            // 1. Detección de Pendientes (Eyder Flow)
+            if (ultV) {
+                // Caso A: Tiene valoración pero NO tiene plan asignado a esa valoración
+                const planAsociadoAV_id = ultP?.valoracionId === ultV.id;
+                
+                if (!ultP || !planAsociadoAV_id) {
+                    tipoRiesgo = 'Sin Plan Asignado';
+                    prioridad = 'Alta';
+                    fechaReferencia = ultV.fecha; // Usamos la fecha de la valoración
+                } 
+                // Caso B: Tiene plan pero NO ha sido enviado
+                else if (ultP.estadoEnvio === 'pendiente') {
+                    tipoRiesgo = 'Plan Sin Enviar';
+                    prioridad = 'Alta';
+                    fechaReferencia = ultP.fechaCreacion;
+                }
             }
 
-            const hasPat = p.antecedentes?.patologia && p.antecedentes.patologia.toLowerCase() !== 'ninguna' && p.antecedentes.patologia.trim() !== '';
-            if (hasPat && Number(ultV?.deficitMusculo || 0) > 3) {
-                tipoRiesgo = tipoRiesgo === 'Abandono' ? 'Abandono + Clínico' : 'Crítico Clínico';
-                prioridad = 'Alta';
+            // 2. Alertas Clínicas / Abandono (Solo si no es un pendiente de Eyder)
+            if (tipoRiesgo === 'Ninguno') {
+                if (diasSinVisita > 45) {
+                    tipoRiesgo = 'Abandono';
+                    prioridad = 'Media';
+                }
+    
+                const hasPat = p.antecedentes?.patologia && p.antecedentes.patologia.toLowerCase() !== 'ninguna' && p.antecedentes.patologia.trim() !== '';
+                if (hasPat && Number(ultV?.deficitMusculo || 0) > 3) {
+                    tipoRiesgo = tipoRiesgo === 'Abandono' ? 'Abandono + Clínico' : 'Crítico Clínico';
+                    prioridad = 'Alta';
+                }
             }
-
+ 
             return {
                 pacienteId: p.id,
                 nombre: p.nombre,
                 diasSinVisita,
                 tipoRiesgo,
                 prioridad,
-                ultimoContacto: ultV ? ultV.fecha : 'Nunca'
+                ultimoContacto: ultV ? ultV.fecha : 'Nunca',
+                fechaPlan: fechaReferencia // Esta es la fecha que mostramos en la tabla
             };
         })
-        .filter(a => a.tipoRiesgo !== 'Ninguno' || a.diasSinVisita > 30)
+        .filter(a => a.tipoRiesgo !== 'Ninguno')
         .sort((a, b) => {
             const scorePrioridad = { 'Alta': 3, 'Media': 2, 'Baja': 1 };
+            // Dar prioridad absoluta a los pendientes de Eyder
+            const isEyderA = a.tipoRiesgo === 'Sin Plan Asignado' || a.tipoRiesgo === 'Plan Sin Enviar';
+            const isEyderB = b.tipoRiesgo === 'Sin Plan Asignado' || b.tipoRiesgo === 'Plan Sin Enviar';
+            
+            if (isEyderA && !isEyderB) return -1;
+            if (isEyderB && !isEyderA) return 1;
+            
             return scorePrioridad[b.prioridad] - scorePrioridad[a.prioridad] || b.diasSinVisita - a.diasSinVisita;
         });
-
+ 
         return ok(res, alertas);
     } catch (err) {
         next(err);
