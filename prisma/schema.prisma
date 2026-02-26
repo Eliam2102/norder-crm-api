@@ -1,0 +1,424 @@
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Paciente {
+  id                   String    @id @default(uuid())
+  nombre               String
+  apellido             String?
+  telefono             String    @unique
+  email                String?
+  fechaNacimiento      DateTime  @map("fecha_nacimiento") @db.Date
+  sexo                 String
+  complexion           Decimal?  @db.Decimal(5, 2)
+  fechaRegistro        DateTime  @default(now()) @map("fecha_registro")
+  nivelMembresia       String    @default("ninguna") @map("nivel_membresia")
+  suscripcionIdExterno String?   @map("suscripcion_id_externo")
+  suscripcionInicio    DateTime? @map("suscripcion_inicio") @db.Date
+  suscripcionFin       DateTime? @map("suscripcion_fin") @db.Date
+
+  datosEjercicio   DatosEjercicio?
+  consumoCalorico  ConsumoCalorico?
+  antecedentes     Antecedentes?
+  valoraciones     Valoracion[]
+  revisiones       Revision[]
+  planes           Plan[]
+  temarioConsultas TemarioConsulta[]
+  requerimientos   Requerimiento[]
+
+  @@map("paciente")
+}
+
+model DatosEjercicio {
+  id                   String  @id @default(uuid())
+  pacienteId           String  @unique @map("paciente_id")
+  objetivo             String?
+  gymDeOrigen          String? @map("gym_de_origen")
+  disciplina           String?
+  horaEntrenamiento    String? @map("hora_entrenamiento")
+  frecuencia           String?
+  tiempoDuracion       String? @map("tiempo_duracion")
+  detallesAdicionales  String? @map("detalles_adicionales")
+  porcentajeSedentario Int     @default(10) @map("porcentaje_sedentario")
+  porcentajeLeve       Int     @default(20) @map("porcentaje_leve")
+  porcentajeModerado   Int     @default(30) @map("porcentaje_moderado")
+  porcentajeIntenso    Int     @default(40) @map("porcentaje_intenso")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("datos_ejercicio")
+}
+
+model ConsumoCalorico {
+  id                    String  @id @default(uuid())
+  pacienteId            String  @unique @map("paciente_id")
+  recordatorio24hActivo Boolean @default(false) @map("recordatorio_24h_activo")
+  horaDesayuno          String? @map("hora_desayuno")
+  horaColacion1         String? @map("hora_colacion1")
+  horaAlmuerzo          String? @map("hora_almuerzo")
+  horaColacion2         String? @map("hora_colacion2")
+  horaCena              String? @map("hora_cena")
+  ayerDesayuno          String? @map("ayer_desayuno")
+  ayerColacion1         String? @map("ayer_colacion1")
+  ayerAlmuerzo          String? @map("ayer_almuerzo")
+  ayerColacion2         String? @map("ayer_colacion2")
+  ayerCena              String? @map("ayer_cena")
+  usalmenteDesayuno     String? @map("usualmente_desayuno")
+  usalmenteColacion1    String? @map("usualmente_colacion1")
+  usalmenteAlmuerzo     String? @map("usualmente_almuerzo")
+  usalmenteColacion2    String? @map("usualmente_colacion2")
+  usalmenteCena         String? @map("usualmente_cena")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("consumo_calorico")
+}
+
+model Antecedentes {
+  id                          String  @id @default(uuid())
+  pacienteId                  String  @unique @map("paciente_id")
+  alimentosNoGusta            String? @map("alimentos_no_gusta")
+  alimentosGusta              String? @map("alimentos_gusta")
+  alergicoA                   String? @map("alergico_a")
+  patologia                   String?
+  cirugias                    String?
+  estrenimiento               Boolean @default(false)
+  consumoAlcohol              Boolean @default(false) @map("consumo_alcohol")
+  tabaco                      Boolean @default(false)
+  consumoAgua                 String? @map("consumo_agua")
+  cicloMenstrual              String? @map("ciclo_menstrual")
+  signosSintomas              String? @map("signos_sintomas")
+  suplementacionHistorial     String? @map("suplementacion_historial")
+  suplementacionRecomendacion String? @map("suplementacion_recomendacion")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("antecedentes")
+}
+
+model Valoracion {
+  id                      String   @id @default(uuid())
+  pacienteId              String   @map("paciente_id")
+  fecha                   DateTime @default(now()) @db.Date
+  hora                    String?
+  medicionNumero          Int?     @map("medicion_numero")
+  peso                    Decimal  @db.Decimal(12, 4)
+  talla                   Decimal  @db.Decimal(12, 4)
+  imc                     Decimal? @db.Decimal(12, 4)
+  // Pliegues
+  pliegeTricep            Decimal? @map("pliegue_tricep") @db.Decimal(12, 4)
+  pliegeBicep             Decimal? @map("pliegue_bicep") @db.Decimal(12, 4)
+  pliegueSubescapular     Decimal? @map("pliegue_subescapular") @db.Decimal(12, 4)
+  pliegueCrestaIliaca     Decimal? @map("pliegue_cresta_iliaca") @db.Decimal(12, 4)
+  pliegueSupraespinal     Decimal? @map("pliegue_supraespinal") @db.Decimal(12, 4)
+  pliegueAbdominal        Decimal? @map("pliegue_abdominal") @db.Decimal(12, 4)
+  pliegueMusloFrontal     Decimal? @map("pliegue_muslo_frontal") @db.Decimal(12, 4)
+  plieguePantorrilla      Decimal? @map("pliegue_pantorrilla") @db.Decimal(12, 4)
+  sumaPliegues            Decimal? @map("suma_pliegues") @db.Decimal(12, 4)
+  // Perímetros
+  perimetroMuneca         Decimal? @map("perimetro_muneca") @db.Decimal(12, 4)
+  perimetroBrazoRelajado  Decimal? @map("perimetro_brazo_relajado") @db.Decimal(12, 4)
+  perimetroBrazoContraido Decimal? @map("perimetro_brazo_contraido") @db.Decimal(12, 4)
+  perimetroPectoral       Decimal? @map("perimetro_pectoral") @db.Decimal(12, 4)
+  perimetroCintura        Decimal? @map("perimetro_cintura") @db.Decimal(12, 4)
+  perimetroAbdomen        Decimal? @map("perimetro_abdomen") @db.Decimal(12, 4)
+  perimetroCadera         Decimal? @map("perimetro_cadera") @db.Decimal(12, 4)
+  perimetroMusloFrontal   Decimal? @map("perimetro_muslo_frontal") @db.Decimal(12, 4)
+  perimetroPantorrilla    Decimal? @map("perimetro_pantorrilla") @db.Decimal(12, 4)
+  brazoCorregido          Decimal? @map("brazo_corregido") @db.Decimal(12, 4)
+  piernaCorregida         Decimal? @map("pierna_corregida") @db.Decimal(12, 4)
+  pantorrillaCorregida    Decimal? @map("pantorrilla_corregida") @db.Decimal(12, 4)
+  // Diámetros
+  diametroBiestiloideo    Decimal? @map("diametro_biestiloideo") @db.Decimal(12, 4)
+  diametroBiepicondHumero Decimal? @map("diametro_biepicondilo_humero") @db.Decimal(12, 4)
+  diametroBiepicondFemur  Decimal? @map("diametro_biepicondilo_femur") @db.Decimal(12, 4)
+  // Bioimpedancia
+  bioimpedanciaPctGrasa   Decimal? @map("bioimpedancia_porcentaje_grasa") @db.Decimal(12, 4)
+  bioimpedanciaPctAgua    Decimal? @map("bioimpedancia_porcentaje_agua") @db.Decimal(12, 4)
+  bioimpedanciaKgMusculo  Decimal? @map("bioimpedancia_kg_musculo") @db.Decimal(12, 4)
+  bioimpedanciaEnergia    Decimal? @map("bioimpedancia_energia") @db.Decimal(12, 4)
+  // Bioquímicos
+  bioquimicoGlucosa       Decimal? @map("bioquimico_glucosa") @db.Decimal(12, 4)
+  bioquimicoTrigliceridos Decimal? @map("bioquimico_trigliceridos") @db.Decimal(12, 4)
+  bioquimicoColesterol    Decimal? @map("bioquimico_colesterol") @db.Decimal(12, 4)
+  bioquimicoCreatinina    Decimal? @map("bioquimico_creatinina") @db.Decimal(12, 4)
+  bioquimicoAcidoUrico    Decimal? @map("bioquimico_acido_urico") @db.Decimal(12, 4)
+  // Signos vitales
+  frecuenciaCardiaca      Int?     @map("frecuencia_cardiaca")
+  presionArterial         String?  @map("presion_arterial")
+  // 2 Componentes
+  pctGrasa2comp           Decimal? @map("porcentaje_grasa_2comp") @db.Decimal(12, 4)
+  kgGrasa2comp            Decimal? @map("kg_grasa_2comp") @db.Decimal(12, 4)
+  kgMasaMagra2comp        Decimal? @map("kg_masa_magra_2comp") @db.Decimal(12, 4)
+  // 4 Componentes
+  superficieCorporal      Decimal? @map("superficie_corporal") @db.Decimal(12, 4)
+  pctGrasaCorporal4comp   Decimal? @map("porcentaje_grasa_corporal_4comp") @db.Decimal(12, 4)
+  masaGrasaReal           Decimal? @map("masa_grasa_real") @db.Decimal(12, 4)
+  pctGrasaIdeal           Decimal? @map("porcentaje_grasa_ideal") @db.Decimal(12, 4)
+  masaGrasaIdeal          Decimal? @map("masa_grasa_ideal") @db.Decimal(12, 4)
+  resultadoImc4comp       String?  @map("resultado_imc_4comp")
+  masaVisceral            Decimal? @map("masa_visceral") @db.Decimal(12, 4)
+  masaOsea                Decimal? @map("masa_osea") @db.Decimal(12, 4)
+  pctMasaOsea             Decimal? @map("porcentaje_masa_osea") @db.Decimal(12, 4)
+  pctMasaVisceral         Decimal? @map("porcentaje_masa_visceral") @db.Decimal(12, 4)
+  masaMuscular            Decimal? @map("masa_muscular") @db.Decimal(12, 4)
+  pctMasaMuscular         Decimal? @map("porcentaje_masa_muscular") @db.Decimal(12, 4)
+  pctMusculoIdeal         Decimal? @map("porcentaje_musculo_ideal") @db.Decimal(12, 4)
+  musculoIdeal            Decimal? @map("musculo_ideal") @db.Decimal(12, 4)
+  masaMagra               Decimal? @map("masa_magra") @db.Decimal(12, 4)
+  deficitMuscular         Decimal? @map("deficit_muscular") @db.Decimal(12, 4)
+  deficitCalorico         Decimal? @map("deficit_calorico") @db.Decimal(12, 4)
+  pesoIdeal               Decimal? @map("peso_ideal") @db.Decimal(12, 4)
+  pesoTeoricoMin          Decimal? @map("peso_teorico_min") @db.Decimal(12, 4)
+  pesoTeoricoMax          Decimal? @map("peso_teorico_max") @db.Decimal(12, 4)
+  pesoAjustado            Decimal? @map("peso_ajustado") @db.Decimal(12, 4)
+  sobrepeso               Decimal? @db.Decimal(12, 4)
+  indiceProporcionalidad  Decimal? @map("indice_proporcionalidad") @db.Decimal(12, 4)
+  // Somatometría
+  endomorfico             Decimal? @db.Decimal(12, 4)
+  mesomorfico             Decimal? @db.Decimal(12, 4)
+  ectomorfico             Decimal? @db.Decimal(12, 4)
+  clasificacionIp         String?  @map("clasificacion_ip")
+  indicePonderal          Decimal? @map("indice_ponderal") @db.Decimal(12, 4)
+  complexion              Decimal? @db.Decimal(12, 4)
+  clasifComplexion        String?  @map("clasif_complexion")
+  // Competencia
+  esquemaCompetencia      String?  @map("esquema_competencia")
+  etapaCompetitiva        String?  @map("etapa_competitiva")
+  tipoDietaCompetencia    String?  @map("tipo_dieta_competencia")
+  // Bioimpedancia extra / Otros
+  densidad2comp           Decimal? @map("densidad_2comp") @db.Decimal(12, 4)
+  // Notas
+  comentarios             String?
+  suplementacionProductos String?  @map("suplementacion_productos")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  paciente        Paciente          @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  temarioConsulta TemarioConsulta[]
+  revisiones      Revision[]
+  planes          Plan[]
+  requerimientos  Requerimiento[]
+
+  @@map("valoracion")
+}
+
+model TemarioConsulta {
+  id           String  @id @default(uuid())
+  valoracionId String  @map("valoracion_id")
+  pacienteId   String  @map("paciente_id")
+  tema         String
+  detalle      String?
+  orden        Int?
+
+  valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
+  paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("temario_consulta")
+}
+
+model Revision {
+  id              String   @id @default(uuid())
+  pacienteId      String   @map("paciente_id")
+  valoracionId    String?  @map("valoracion_id")
+  fecha           DateTime @default(now()) @db.Date
+  peso            Decimal  @db.Decimal(5, 2)
+  talla           Decimal  @db.Decimal(4, 3)
+  porcentajeGrasa Decimal? @map("porcentaje_grasa") @db.Decimal(5, 2)
+  masaMagra       Decimal? @map("masa_magra") @db.Decimal(5, 2)
+  cintura         Decimal? @db.Decimal(5, 2)
+  cadera          Decimal? @db.Decimal(5, 2)
+  factorActividad Decimal  @map("factor_actividad") @db.Decimal(3, 2)
+  formulaTmbUsada String   @default("harris_benedict") @map("formula_tmb_usada")
+  imc             Decimal  @db.Decimal(5, 2)
+  tmb             Decimal  @db.Decimal(7, 2)
+  get             Decimal  @db.Decimal(7, 2)
+  ger             Decimal? @db.Decimal(7, 2)
+  eta             Decimal? @db.Decimal(7, 2)
+  af              Decimal? @db.Decimal(7, 2)
+  deporte         Decimal? @db.Decimal(7, 2)
+  gct             Decimal? @db.Decimal(7, 2)
+  factorDeporte   Decimal? @map("factor_deporte") @db.Decimal(5, 2)
+  metsDeporte     Decimal? @map("mets_deporte") @db.Decimal(5, 2)
+  comentarios     String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  paciente   Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
+  planes     Plan[]
+
+  @@map("revision")
+}
+
+model Plan {
+  id                String    @id @default(uuid())
+  pacienteId        String?   @map("paciente_id")
+  revisionId        String?   @map("revision_id")
+  valoracionId      String?   @map("valoracion_id")
+  fechaCreacion     DateTime  @default(now()) @map("fecha_creacion")
+  tipoPlan          String    @map("tipo_plan")
+  calorias          Int
+  proteinasPct      Decimal   @map("proteinas_pct") @db.Decimal(5, 2)
+  carbohidratosPct  Decimal   @map("carbohidratos_pct") @db.Decimal(5, 2)
+  grasasPct         Decimal   @map("grasas_pct") @db.Decimal(5, 2)
+  proteinasKcal     Int?      @map("proteinas_kcal")
+  carbohidratosKcal Int?      @map("carbohidratos_kcal")
+  grasasKcal        Int?      @map("grasas_kcal")
+  proteinasGr       Decimal?  @map("proteinas_gr") @db.Decimal(6, 2)
+  carbohidratosGr   Decimal?  @map("carbohidratos_gr") @db.Decimal(6, 2)
+  grasasGr          Decimal?  @map("grasas_gr") @db.Decimal(6, 2)
+  proteinasGrKg     Decimal?  @map("proteinas_gr_kg") @db.Decimal(5, 2)
+  carbohidratosGrKg Decimal?  @map("carbohidratos_gr_kg") @db.Decimal(5, 2)
+  grasasGrKg        Decimal?  @map("grasas_gr_kg") @db.Decimal(5, 2)
+  proximaSesion     DateTime? @map("proxima_sesion")
+  notasGenerales    String?   @map("notas_generales")
+  estado            String    @default("activo")
+  estadoEnvio       String    @default("pendiente") @map("estado_envio")
+  pdfUrl            String?   @map("pdf_url")
+  pdfGeneradoAt     DateTime? @map("pdf_generado_at")
+
+  paciente   Paciente?   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  revision   Revision?   @relation(fields: [revisionId], references: [id], onDelete: SetNull)
+  valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
+  menus      PlanMenu[]
+
+  @@map("plan")
+}
+
+model PlanMenu {
+  id        String   @id @default(uuid())
+  planId    String   @map("plan_id")
+  nombre    String   @default("Menú #1")
+  orden     Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  plan          Plan               @relation(fields: [planId], references: [id], onDelete: Cascade)
+  tiemposComida PlanTiempoComida[]
+
+  @@map("plan_menu")
+}
+
+model PlanTiempoComida {
+  id        String   @id @default(uuid())
+  menuId    String   @map("menu_id")
+  nombre    String
+  orden     Int      @default(1)
+  notaPie   String?  @map("nota_pie")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  menu         PlanMenu          @relation(fields: [menuId], references: [id], onDelete: Cascade)
+  ingredientes PlanIngrediente[]
+
+  @@map("plan_tiempo_comida")
+}
+
+model PlanIngrediente {
+  id             String   @id @default(uuid())
+  tiempoComidaId String   @map("tiempo_comida_id")
+  descripcion    String
+  cantidad       Decimal? @db.Decimal(8, 2)
+  unidad         String?
+  eqCantidad     Decimal? @map("eq_cantidad") @db.Decimal(5, 1)
+  eqGrupo        String?  @map("eq_grupo")
+  nota           String?
+  orden          Int      @default(1)
+
+  tiempoComida PlanTiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
+
+  @@map("plan_ingrediente")
+}
+
+model Requerimiento {
+  id           String   @id @default(uuid())
+  pacienteId   String   @map("paciente_id")
+  valoracionId String?  @map("valoracion_id")
+  fecha        DateTime @default(now())
+
+  // Base
+  peso  Float
+  talla Float
+  edad  Int
+  sexo  String
+
+  // Energético
+  formulaTmb      String @map("formula_tmb")
+  factorActividad Float  @map("factor_actividad")
+  tmb             Float
+  get             Float
+  ger             Float?
+  eta             Float?
+  af              Float?
+  deporte         Float?
+  gct             Float?
+
+  // Macros %
+  pctProteinas Float? @map("pct_proteinas")
+  pctCarbs     Float? @map("pct_carbs")
+  pctLipidos   Float? @map("pct_lipidos")
+
+  // Macros kcal
+  kcalProteinas Float? @map("kcal_proteinas")
+  kcalCarbs     Float? @map("kcal_carbs")
+  kcalLipidos   Float? @map("kcal_lipidos")
+
+  // Macros gramos
+  grProteinas Float? @map("gr_proteinas")
+  grCarbs     Float? @map("gr_carbs")
+  grLipidos   Float? @map("gr_lipidos")
+
+  // Macros gr/kg
+  grKgProteinas Float? @map("gr_kg_proteinas")
+  grKgCarbs     Float? @map("gr_kg_carbs")
+  grKgLipidos   Float? @map("gr_kg_lipidos")
+
+  // Equivalentes por grupo
+  eqVerduras     Float? @map("eq_verduras")
+  eqFrutas       Float? @map("eq_frutas")
+  eqCerealSinGr  Float? @map("eq_cereal_sin_gr")
+  eqCerealConGr  Float? @map("eq_cereal_con_gr")
+  eqLeguminosas  Float? @map("eq_leguminosas")
+  eqAoaMuyBajo   Float? @map("eq_aoa_muy_bajo")
+  eqAoaBajo      Float? @map("eq_aoa_bajo")
+  eqAoaModerado  Float? @map("eq_aoa_moderado")
+  eqAoaAlto      Float? @map("eq_aoa_alto")
+  eqLecheDesc    Float? @map("eq_leche_desc")
+  eqLecheSemi    Float? @map("eq_leche_semi")
+  eqLecheEntera  Float? @map("eq_leche_entera")
+  eqLecheAz      Float? @map("eq_leche_az")
+  eqGrasaSinProt Float? @map("eq_grasa_sin_prot")
+  eqGrasaConProt Float? @map("eq_grasa_con_prot")
+  eqAzSinGr      Float? @map("eq_az_sin_gr")
+  eqAzConGr      Float? @map("eq_az_con_gr")
+
+  // Distribución por tiempo de comida (JSON serializado)
+  distribucionJson String? @map("distribucion_json")
+
+  comentarios String?
+  creadoEn    DateTime @default(now()) @map("creado_en")
+
+  paciente   Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
+
+  @@map("requerimiento")
+}
+
+model Configuracion {
+  id            String   @id @default("singleton")
+  nombre        String?
+  cedula        String?
+  universidad   String?
+  profesion     String?
+  certificacion String?
+  telefono      String?
+  email         String?
+  direccion     String?
+  logoUrl       String?  @map("logo_url")
+  firmaUrl      String?  @map("firma_url")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("configuracion")
+}
