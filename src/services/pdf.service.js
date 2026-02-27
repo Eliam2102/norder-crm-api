@@ -47,13 +47,13 @@ export const generarPlanPDF = async (plan) => {
     <body>
         <div class="header">
           <div class="header-logo">
-            NORER<span>THINK · EAT · LIVE</span>
+            norder<span>THINK · EAT · LIVE</span>
           </div>
           <div class="header-info">
             ${config.nombre || process.env.NUTRICIONISTA_NOMBRE || "L.N. Eyder Méndez Gamboa"}<br>
             ${config.profesion || ""} ${config.cedula ? `| Cédula: ${config.cedula}` : ""}${config.universidad ? `<br>${config.universidad}` : ""}<br>
             ${config.certificacion || process.env.NUTRICIONISTA_CERTIFICACION || "Certificación ISAK Nivel 2"}<br>
-            ${config.telefono || process.env.NUTRICIONISTA_TELEFONO || "999 365 7830"} | ${config.email || process.env.NUTRICIONISTA_EMAIL || "eyder@norer.mx"}<br>
+            ${config.telefono || process.env.NUTRICIONISTA_TELEFONO || "999 365 7830"} | ${config.email || process.env.NUTRICIONISTA_EMAIL || "eyder@norder.mx"}<br>
             ${config.direccion || process.env.NUTRICIONISTA_DIRECCION || "Mérida, Yucatán, México"}
           </div>
         </div>

@@ -36,7 +36,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/temp', express.static('/tmp'));
 
 // Health check
-app.get('/health', (req, res) => res.json({ status: 'ok', service: 'NORER HEALTH API' }));
+app.get('/health', (req, res) => res.json({ status: 'ok', service: 'norder HEALTH API' }));
 
 // API Routes
 app.use('/api/auth', authRoutes);
