@@ -21,7 +21,10 @@ export const getAll = async (req, res, next) => {
             where,
             include: {
                 valoraciones: {
-                    orderBy: { fecha: 'desc' },
+                    orderBy: [
+                        { fecha: 'desc' },
+                        { numeroValoracion: 'desc' }
+                    ],
                     take: 1
                 },
                 planes: {
@@ -138,7 +141,10 @@ export const getById = async (req, res, next) => {
                 consumoCalorico: true,
                 antecedentes: true,
                 valoraciones: { 
-                    orderBy: { fecha: 'desc' }, 
+                    orderBy: [
+                        { fecha: 'desc' },
+                        { numeroValoracion: 'desc' }
+                    ], 
                     include: { temarioConsulta: true, planes: { take: 1, orderBy: { fechaCreacion: 'desc' } } } 
                 },
                 planes: { orderBy: { fechaCreacion: 'desc' } },
@@ -146,22 +152,75 @@ export const getById = async (req, res, next) => {
             }
         });
 
-        const { datosEjercicio, consumoCalorico, antecedentes, valoraciones, ...rest } = paciente;
+        const { datosEjercicio: de, consumoCalorico: cc, antecedentes: ant, valoraciones: val, ...rest } = paciente;
         
         // Map valoraciones to include a singular plan object
-        const valoracionesMapped = valoraciones.map(v => {
+        const valoracionesMapped = val.map(v => {
             const { planes, ...vRest } = v;
             return { ...vRest, plan: planes[0] || null };
         });
 
-        return ok(res, { 
+        const mapped = { 
             ...rest,
-            ejercicio: datosEjercicio || {},
-            antecedentes: antecedentes || {},
-            habitos: consumoCalorico || {},
+            // Reconstrucción de la estructura original
+            ejercicio: de ? {
+                ...de,
+                objetivo: de.objetivo,
+                gymOrigen: de.gymOrigen,
+                disciplina: de.disciplina,
+                frecuencia: de.frecuencia,
+                tiempo: de.tiempo,
+                nivelActividad: de.nivelActividad
+            } : {},
+            antecedentes: ant ? {
+                ...ant,
+                alimentosNoGustan: ant.alimentosNoGustan,
+                alimentosGustan: ant.alimentosGustan,
+                alergias: ant.alergias,
+                patologia: ant.patologia,
+                cirugias: ant.cirugias,
+                estrenimiento: ant.estrenimiento,
+                consumoAlcohol: ant.consumoAlcohol,
+                tabaco: ant.tabaco,
+                agua: ant.agua,
+                cicloMenstrual: ant.cicloMenstrual,
+                signosYSintomas: ant.signosYSintomas,
+                historialProductos: ant.historialProductos,
+                recomendacionSuplementos: ant.recomendacionSuplementos
+            } : {},
+            habitos: cc ? {
+                ...cc,
+                desayuno: {
+                    hora: cc.horaDesayuno,
+                    ayer: cc.ayerDesayuno,
+                    usualmente: cc.usalmenteDesayuno
+                },
+                colacion1: {
+                    hora: cc.horaColacion1,
+                    ayer: cc.ayerColacion1,
+                    usualmente: cc.usalmenteColacion1
+                },
+                almuerzo: {
+                    hora: cc.horaAlmuerzo,
+                    ayer: cc.ayerAlmuerzo,
+                    usualmente: cc.usalmenteAlmuerzo
+                },
+                colacion2: {
+                    hora: cc.horaColacion2,
+                    ayer: cc.ayerColacion2,
+                    usualmente: cc.usalmenteColacion2
+                },
+                cena: {
+                    hora: cc.horaCena,
+                    ayer: cc.ayerCena,
+                    usualmente: cc.usalmenteCena
+                }
+            } : {},
             valoraciones: valoracionesMapped,
             ultimaValoracion: valoracionesMapped[0] || null
-        });
+        };
+
+        return ok(res, mapped);
     } catch (err) {
         next(err);
     }

@@ -11,22 +11,29 @@ export const getAll = async (req, res, next) => {
                 planes: {
                     select: {
                         id: true,
+                        valoracionId: true,
                         tipoPlan: true,
                         estado: true,
+                        estadoEnvio: true,
                         fechaCreacion: true
                     },
                     orderBy: { fechaCreacion: 'desc' }
                 }
             },
-            orderBy: { fecha: 'desc' }
+            orderBy: [
+                { fecha: 'desc' },
+                { numeroValoracion: 'desc' }
+            ]
         });
 
         return ok(res, valoraciones.map(v => {
             const { planes, ...rest } = v;
+            // The plan for this specific valoracion is the one where valoracionId === v.id
+            const specificPlan = planes.find(p => p.valoracionId === v.id);
             return { 
                 ...rest, 
-                plan: planes[0] || null,
-                planId: planes[0]?.id || null // Added for explicit frontend detection
+                plan: specificPlan || null,
+                planId: specificPlan?.id || null 
             };
         }));
     } catch (err) {
@@ -142,91 +149,8 @@ export const create = async (req, res, next) => {
             }
         });
 
-        // Clonar plan activo previo si existe
-        const planPrevio = await prisma.plan.findFirst({
-            where: { pacienteId, estado: 'activo' },
-            include: {
-                menus: {
-                    include: {
-                        tiemposComida: {
-                            include: { ingredientes: true }
-                        }
-                    }
-                }
-            },
-            orderBy: { fechaCreacion: 'desc' }
-        });
-
-        if (planPrevio) {
-            // Clonar Plan
-            const nuevoPlan = await prisma.plan.create({
-                data: {
-                    pacienteId,
-                    valoracionId: valoracion.id,
-                    tipoPlan: planPrevio.tipoPlan,
-                    calorias: planPrevio.calorias,
-                    proteinasPct: planPrevio.proteinasPct,
-                    carbohidratosPct: planPrevio.carbohidratosPct,
-                    grasasPct: planPrevio.grasasPct,
-                    proteinasKcal: planPrevio.proteinasKcal,
-                    carbohidratosKcal: planPrevio.carbohidratosKcal,
-                    grasasKcal: planPrevio.grasasKcal,
-                    proteinasGr: planPrevio.proteinasGr,
-                    carbohidratosGr: planPrevio.carbohidratosGr,
-                    grasasGr: planPrevio.grasasGr,
-                    proteinasGrKg: planPrevio.proteinasGrKg,
-                    carbohidratosGrKg: planPrevio.carbohidratosGrKg,
-                    grasasGrKg: planPrevio.grasasGrKg,
-                    notasGenerales: planPrevio.notasGenerales,
-                    estado: 'activo'
-                }
-            });
-
-            // Clonar Menus
-            for (const menu of planPrevio.menus) {
-                const nuevoMenu = await prisma.planMenu.create({
-                    data: {
-                        planId: nuevoPlan.id,
-                        nombre: menu.nombre,
-                        orden: menu.orden
-                    }
-                });
-
-                for (const tiempo of menu.tiemposComida) {
-                    const nuevoTiempo = await prisma.planTiempoComida.create({
-                        data: {
-                            menuId: nuevoMenu.id,
-                            nombre: tiempo.nombre,
-                            orden: tiempo.orden,
-                            notaPie: tiempo.notaPie
-                        }
-                    });
-
-                    for (const ing of tiempo.ingredientes) {
-                        await prisma.planIngrediente.create({
-                            data: {
-                                tiempoComidaId: nuevoTiempo.id,
-                                descripcion: ing.descripcion,
-                                cantidad: ing.cantidad,
-                                unidad: ing.unidad,
-                                eqCantidad: ing.eqCantidad,
-                                eqGrupo: ing.eqGrupo,
-                                nota: ing.nota,
-                                orden: ing.orden
-                            }
-                        });
-                    }
-                }
-            }
-            
-            // Archivar el plan previo ahora que se clonó para esta valoración
-            await prisma.plan.update({
-                where: { id: planPrevio.id },
-                data: { estado: 'archivado' }
-            });
-        }
-
         return ok(res, valoracion, 201);
+
     } catch (err) {
         next(err);
     }
@@ -237,13 +161,87 @@ export const getById = async (req, res, next) => {
         const valoracion = await prisma.valoracion.findUniqueOrThrow({
             where: { id: req.params.id },
             include: {
+                paciente: true,
                 temarioConsulta: true,
                 revisiones: true,
-                planes: { include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } } }
+                planes: { 
+                    include: { 
+                        menus: { 
+                            include: { 
+                                tiemposComida: { 
+                                    include: { 
+                                        ingredientes: true 
+                                    } 
+                                } 
+                            } 
+                        } 
+                    },
+                    orderBy: { fechaCreacion: 'desc' }
+                }
             }
         });
+
         const { planes, ...rest } = valoracion;
-        return ok(res, { ...rest, plan: planes[0] || null });
+        
+        // El plan de esta valoración específica
+        const specificPlan = planes.find(p => p.valoracionId === valoracion.id);
+
+        // Mapear campos planos de vuelta a la estructura de objetos que espera el frontend
+        const mapped = {
+            ...rest,
+            plan: specificPlan || null,
+            // Reconstrucción de sub-objetos para que el frontend "vea" todos los datos originales
+            pliegues: {
+                tricep: rest.pliegeTricep,
+                bicep: rest.pliegeBicep,
+                subescapular: rest.pliegueSubescapular,
+                crestaIliaca: rest.pliegueCrestaIliaca,
+                supraespinal: rest.pliegueSupraespinal,
+                abdominal: rest.pliegueAbdominal,
+                musloFrontal: rest.pliegueMusloFrontal,
+                pantorrilla: rest.plieguePantorrilla,
+            },
+            perimetros: {
+                muneca: rest.perimetroMuneca,
+                brazoRelajado: rest.perimetroBrazoRelajado,
+                brazoContraido: rest.perimetroBrazoContraido,
+                pectoral: rest.perimetroPectoral,
+                cintura: rest.perimetroCintura,
+                abdomen: rest.perimetroAbdomen,
+                cadera: rest.perimetroCadera,
+                musloFrontal: rest.perimetroMusloFrontal,
+                pantorrilla: rest.perimetroPantorrilla,
+                brazoCor: rest.brazoCorregido,
+                piernaCor: rest.piernaCorregida,
+                pantoCor: rest.pantorrillaCorregida,
+            },
+            diametros: {
+                "Biestiloideo (Muñeca)": rest.diametroBiestiloideo,
+                "Biepicondilar Húmero": rest.diametroBiepicondHumero,
+                "Biepicondilar Fémur": rest.diametroBiepicondFemur,
+            },
+            bioimpedancia: {
+                "Grasa %": rest.bioGrasa,
+                "Músculo %": rest.bioMusculo,
+                "Agua %": rest.bioAgua,
+                "Grasa Visceral": rest.masaVisceral,
+                "Edad Metabólica": rest.edadMetabolica,
+                "Energía (kcal)": rest.bioEnergia,
+            },
+            bioquimicos: {
+                Tag: rest.trigliceridos,
+                Glu: rest.glucosa,
+                Col: rest.colesterol,
+                Urico: rest.acidoUrico,
+                Creat: rest.creatinina,
+            },
+            // Aliases comunes
+            peso: rest.pesoActual,
+            talla: rest.estatura,
+            deficitMuscular: rest.deficitMusculo,
+        };
+
+        return ok(res, mapped);
     } catch (err) {
         next(err);
     }

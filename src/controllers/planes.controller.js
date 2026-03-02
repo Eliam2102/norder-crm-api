@@ -81,10 +81,10 @@ export const create = async (req, res, next) => {
             });
         }
 
-        const kcal = parseFloat(calorias) || 0;
-        const pP = parseFloat(proteinasPct) || 0;
-        const cP = parseFloat(carbohidratosPct) || 0;
-        const gP = parseFloat(grasasPct) || 0;
+        const kcal = parseFloat((calorias || 0).toString().replace(',', '.'));
+        const pP = parseFloat((proteinasPct || 0).toString().replace(',', '.'));
+        const cP = parseFloat((carbohidratosPct || 0).toString().replace(',', '.'));
+        const gP = parseFloat((grasasPct || 0).toString().replace(',', '.'));
 
         let proximaDateTime = null;
         if (proximaSesion) {
@@ -200,10 +200,10 @@ export const update = async (req, res, next) => {
             ...extra
         } = req.body;
 
-        const kcal = parseFloat(calorias);
-        const pP = parseFloat(proteinasPct);
-        const cP = parseFloat(carbohidratosPct);
-        const gP = parseFloat(grasasPct);
+        const kcal = parseFloat((calorias || 0).toString().replace(',', '.'));
+        const pP = parseFloat((proteinasPct || 0).toString().replace(',', '.'));
+        const cP = parseFloat((carbohidratosPct || 0).toString().replace(',', '.'));
+        const gP = parseFloat((grasasPct || 0).toString().replace(',', '.'));
 
         const dataUpdate = {
             nombre: nombre || nombrePlan,
@@ -409,6 +409,7 @@ export const asignarPlan = async (req, res, next) => {
                 notasGenerales: original.notasGenerales,
                 estado: 'activo',
                 estadoEnvio: 'pendiente',
+                valoracionId: req.body.valoracionId || original.valoracionId || null,
                 menus: {
                     create: original.menus.map(menu => ({
                         nombre: menu.nombre,
