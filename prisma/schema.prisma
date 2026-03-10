@@ -31,6 +31,7 @@ model Paciente {
   planes           Plan[]
   temarioConsultas TemarioConsulta[]
   requerimientos   Requerimiento[]
+  barridos         BarridoEquivalencias[]
 
   @@map("paciente")
 }
@@ -210,6 +211,7 @@ model Valoracion {
   revisiones      Revision[]
   planes          Plan[]
   requerimientos  Requerimiento[]
+  barrido         BarridoEquivalencias?
 
   @@map("valoracion")
 }
@@ -295,6 +297,7 @@ model Plan {
   estadoEnvio    String    @default("pendiente") @map("estado_envio")
   pdfUrl         String?   @map("pdf_url")
   pdfGeneradoAt  DateTime? @map("pdf_generado_at")
+  pdfCustomMeta  Json?     @map("pdf_custom_meta")
 
   paciente   Paciente?   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   revision   Revision?   @relation(fields: [revisionId], references: [id], onDelete: SetNull)
@@ -450,7 +453,44 @@ model Configuracion {
   logoUrl           String?  @map("logo_url")
   firmaUrl          String?  @map("firma_url")
   googleCalendarUrl String?  @map("google_calendar_url")
+  emailRemitente    String?  @map("email_remitente")
+  emailPassword     String?  @map("email_password")
+  asuntoCorreo      String?  @map("asunto_correo")
+  mensajeWhatsApp   String?  @map("mensaje_whats_app")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
   @@map("configuracion")
+}
+
+model BarridoEquivalencias {
+  id            String     @id @default(uuid())
+  pacienteId    String     @map("paciente_id")
+  valoracionId  String     @unique @map("valoracion_id")
+  tiempos       String     // JSON array: ["Snack", "Desayuno", ...]
+  porciones     String     // JSON: { "frutas": 6, ... }
+  distribucion  String     // JSON: { "Desayuno": { "frutas": 3, ... }, ... }
+  kcalTotal     Float?
+  creadoEn      DateTime   @default(now()) @map("creado_en")
+  actualizadoEn DateTime   @updatedAt @map("actualizado_en")
+
+  paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
+
+  @@map("barrido_equivalencias")
+}
+
+model AlimentoSMAE {
+  id              String   @id @default(cuid())
+  nombre          String
+  grupo           String   // verduras | frutas | cerealSinGr | cerealConGr | leguminosas | aoaMuyBajo | aoaBajo | aoaModerado | aoaAlto | lecheDesc | lecheSemi | lecheEntera | lecheAz | grasaSinProt | grasaConProt | azSinGr | azConGr
+  pesoGramos      Float    @map("peso_gramos")
+  porcionCasera   String?  @map("porcion_casera")
+  cantidadPorcion Float?   @map("cantidad_porcion")
+  unidadPorcion   String?  @map("unidad_porcion")
+  notas           String?
+  esPersonalizado Boolean  @default(false) @map("es_personalizado")
+  creadoEn        DateTime @default(now()) @map("creado_en")
+  actualizadoEn   DateTime @updatedAt @map("actualizado_en")
+
+  @@map("alimento_smae")
 }

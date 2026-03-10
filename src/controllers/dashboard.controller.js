@@ -9,22 +9,36 @@ export const getMetricas = async (req, res, next) => {
         const ahora = new Date();
         const hace30d = new Date();
         hace30d.setDate(hace30d.getDate() - 30);
+        
+        const hoy = new Date();
+        const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+        const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
+        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+        const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
 
         // 1. Data Retrieval
         const [
-            pacientesTotales,
-            pacientesNuevos,
-            planesNutricionales,
+            pacientesTotales, 
+            pacientesNuevosMes,
+            pacientesNuevosHoy,
+            planesNutricionales, 
             consultasTotales,
-            config,
-            basica,
-            premium,
+            consultasMes,
+            consultasHoy,
+            consultasAnio,
+            config, 
+            basica, 
+            premium, 
             distribucionObjetivos
         ] = await Promise.all([
             prisma.paciente.count(),
-            prisma.paciente.count({ where: { fechaRegistro: { gte: hace30d } } }),
+            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
+            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
             prisma.plan.count(),
             prisma.valoracion.count(),
+            prisma.valoracion.count({ where: { createdAt: { gte: inicioMes } } }),
+            prisma.valoracion.count({ where: { createdAt: { gte: inicioHoy, lte: finHoy } } }),
+            prisma.valoracion.count({ where: { createdAt: { gte: inicioAnio } } }),
             prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
@@ -107,9 +121,13 @@ export const getMetricas = async (req, res, next) => {
         return ok(res, {
             resumen: {
                 pacientesTotales,
-                pacientesNuevos,
+                pacientesNuevosMes,
+                pacientesNuevosHoy,
                 planesNutricionales,
-                consultasTotales
+                consultasTotales,
+                consultasMes,
+                consultasHoy,
+                consultasAnio
             },
             kpisClave: {
                 tasaRetencion: parseFloat(tasaRetencion.toFixed(1)),
@@ -143,68 +161,78 @@ export const getAlertas = async (req, res, next) => {
                 antecedentes: { select: { patologia: true } },
                 valoraciones: {
                     orderBy: { fecha: 'desc' },
-                    take: 1,
                     select: { id: true, fecha: true, deficitMusculo: true, createdAt: true }
                 },
                 planes: {
-                    orderBy: { fechaCreacion: 'desc' },
-                    take: 1,
-                    select: { valoracionId: true, estadoEnvio: true, nombre: true, fechaCreacion: true }
+                    select: { id: true, valoracionId: true, estadoEnvio: true, nombre: true, fechaCreacion: true }
                 }
             }
         });
  
-        const alertas = pacientes.map(p => {
-            const ultV = p.valoraciones[0];
-            const ultP = p.planes[0];
-            const diasSinVisita = ultV ? Math.floor(Math.abs(ahora - new Date(ultV.fecha)) / (1000 * 60 * 60 * 24)) : 999;
-            
-            let tipoRiesgo = 'Ninguno';
-            let prioridad = 'Baja';
-            let fechaReferencia = ultV ? ultV.fecha : null;
- 
-            // 1. Detección de Pendientes (Eyder Flow)
-            if (ultV) {
-                // Caso A: Tiene valoración pero NO tiene plan asignado a esa valoración
-                const planAsociadoAV_id = ultP?.valoracionId === ultV.id;
-                
-                if (!ultP || !planAsociadoAV_id) {
-                    tipoRiesgo = 'Sin Plan Asignado';
-                    prioridad = 'Alta';
-                    fechaReferencia = ultV.fecha; // Usamos la fecha de la valoración
-                } 
-                // Caso B: Tiene plan pero NO ha sido enviado
-                else if (ultP.estadoEnvio === 'pendiente') {
-                    tipoRiesgo = 'Plan Sin Enviar';
-                    prioridad = 'Alta';
-                    fechaReferencia = ultP.fechaCreacion;
-                }
-            }
+        const alertasRaw = [];
 
-            // 2. Alertas Clínicas / Abandono (Solo si no es un pendiente de Eyder)
-            if (tipoRiesgo === 'Ninguno') {
+        pacientes.forEach(p => {
+            // 1. Alert for EVERY unassigned or unsent valuation
+            p.valoraciones.forEach(v => {
+                const planAsociado = p.planes.find(pl => pl.valoracionId === v.id);
+                const diasSinVisitaVal = Math.floor(Math.abs(ahora - new Date(v.fecha)) / (1000 * 60 * 60 * 24));
+                
+                if (!planAsociado) {
+                    alertasRaw.push({
+                        pacienteId: p.id,
+                        nombre: p.nombre,
+                        diasSinVisita: diasSinVisitaVal,
+                        tipoRiesgo: 'Sin Plan Asignado',
+                        prioridad: 'Alta',
+                        ultimoContacto: v.fecha,
+                        fechaPlan: v.fecha // Reference date
+                    });
+                } else if (planAsociado.estadoEnvio === 'pendiente') {
+                    alertasRaw.push({
+                        pacienteId: p.id,
+                        nombre: p.nombre,
+                        diasSinVisita: diasSinVisitaVal,
+                        tipoRiesgo: 'Plan Sin Enviar',
+                        prioridad: 'Alta',
+                        ultimoContacto: v.fecha,
+                        fechaPlan: planAsociado.fechaCreacion
+                    });
+                }
+            });
+
+            // 2. Clinical rules only apply to the Most Recent Valuation
+            const ultV = p.valoraciones[0];
+            if (ultV) {
+                const diasSinVisita = Math.floor(Math.abs(ahora - new Date(ultV.fecha)) / (1000 * 60 * 60 * 24));
+                let tipoRiesgo = 'Ninguno';
+                let prioridad = 'Baja';
+
                 if (diasSinVisita > 45) {
                     tipoRiesgo = 'Abandono';
                     prioridad = 'Media';
                 }
-    
+
                 const hasPat = p.antecedentes?.patologia && p.antecedentes.patologia.toLowerCase() !== 'ninguna' && p.antecedentes.patologia.trim() !== '';
-                if (hasPat && Number(ultV?.deficitMusculo || 0) > 3) {
+                if (hasPat && Number(ultV.deficitMusculo || 0) > 3) {
                     tipoRiesgo = tipoRiesgo === 'Abandono' ? 'Abandono + Clínico' : 'Crítico Clínico';
                     prioridad = 'Alta';
                 }
+
+                if (tipoRiesgo !== 'Ninguno') {
+                    alertasRaw.push({
+                        pacienteId: p.id,
+                        nombre: p.nombre,
+                        diasSinVisita,
+                        tipoRiesgo,
+                        prioridad,
+                        ultimoContacto: ultV.fecha,
+                        fechaPlan: null
+                    });
+                }
             }
- 
-            return {
-                pacienteId: p.id,
-                nombre: p.nombre,
-                diasSinVisita,
-                tipoRiesgo,
-                prioridad,
-                ultimoContacto: ultV ? ultV.fecha : 'Nunca',
-                fechaPlan: fechaReferencia // Esta es la fecha que mostramos en la tabla
-            };
-        })
+        });
+        
+        const alertas = alertasRaw
         .filter(a => a.tipoRiesgo !== 'Ninguno')
         .sort((a, b) => {
             const scorePrioridad = { 'Alta': 3, 'Media': 2, 'Baja': 1 };
@@ -223,3 +251,31 @@ export const getAlertas = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getTopClientes = async (req, res, next) => {
+    try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+
+        const top = await prisma.paciente.findMany({
+            include: {
+                _count: { select: { valoraciones: true } }
+            },
+            orderBy: {
+                valoraciones: { _count: 'desc' }
+            },
+            take: 10
+        });
+
+        return ok(res, top.map(p => ({
+            id: p.id,
+            nombre: `${p.nombre}${p.apellido ? ' ' + p.apellido : ''}`.trim(),
+            valoraciones: p._count.valoraciones,
+            nivelMembresia: p.nivelMembresia,
+            email: p.email,
+            telefono: p.telefono
+        })));
+    } catch (err) {
+        next(err);
+    }
+};
+

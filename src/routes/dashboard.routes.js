@@ -8,5 +8,6 @@ router.use(authMiddleware);
 
 router.get('/metricas', dashboardController.getMetricas);
 router.get('/alertas', dashboardController.getAlertas);
+router.get('/top-clientes', dashboardController.getTopClientes);
 
 export default router;

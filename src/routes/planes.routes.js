@@ -9,8 +9,10 @@ router.post('/', planesController.create);
 router.get('/:id', planesController.getById);
 router.put('/:id', planesController.update);
 router.get('/:id/pdf', planesController.generatePdf);
+router.post('/:id/pdf/preview', planesController.generatePdfPreview);
 router.post('/:id/enviar', planesController.sendPlan);
 router.put('/:id/estado', planesController.updateEstado);
 router.post('/:id/asignar', planesController.asignarPlan);
+router.put('/:id/pdf-meta', planesController.updatePdfMeta);
 
 export default router;

@@ -16,6 +16,8 @@ import revisionRoutes from './routes/revisiones.routes.js';
 import planRoutes from './routes/planes.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
 import configuracionRoutes from './routes/configuracion.routes.js';
+import barridoRoutes from './routes/barrido.routes.js';
+import alimentosSMAERoutes from './routes/alimentosSmae.routes.js';
 
 const app = express();
 
@@ -44,6 +46,8 @@ app.use('/api/pacientes', pacienteRoutes);
 app.use('/api/planes', planRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/configuracion', configuracionRoutes);
+app.use('/api/alimentos-smae', alimentosSMAERoutes);
+app.use('/api/pacientes/:pacienteId/valoraciones/:valoracionId/barrido', barridoRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {

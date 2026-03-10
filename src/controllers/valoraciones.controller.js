@@ -65,6 +65,9 @@ export const create = async (req, res, next) => {
             faoOmsRequerimiento, calcRapidoNormal, calcRapidoObeso, calcRapidoDesnutricion,
             tallaMin, tallaMax, resultadoImc, resultadoImic,
             createdAt, updatedAt,
+            // Nuevo payload simplificado del frontend
+            pctGrasa,       // frontend lo manda así → guardar como pctGrasa2comp
+            masaMagra,      // campo a guardar directamente en el modelo
             ...rest 
         } = req.body;
 
@@ -72,7 +75,10 @@ export const create = async (req, res, next) => {
             ...rest,
             pesoActual: rest.pesoActual ?? (peso ? parseFloat(peso) : undefined),
             deficitMusculo: rest.deficitMusculo ?? deficitMuscular,
-            estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined)
+            estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined),
+            // Mapeo de campos del nuevo formulario simplificado
+            ...(pctGrasa !== undefined && { pctGrasa2comp: parseFloat(pctGrasa) }),
+            ...(masaMagra !== undefined && { masaMagra: parseFloat(masaMagra) }),
         };
 
         // Pliegues
@@ -239,6 +245,8 @@ export const getById = async (req, res, next) => {
             peso: rest.pesoActual,
             talla: rest.estatura,
             deficitMuscular: rest.deficitMusculo,
+            // Alias para nuevo formulario simplificado
+            pctGrasa: rest.pctGrasa2comp,
         };
 
         return ok(res, mapped);

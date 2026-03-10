@@ -6,7 +6,15 @@ export const get = async (req, res, next) => {
         const config = await prisma.configuracion.findUnique({
             where: { id: 'singleton' }
         });
-        return ok(res, config || {});
+
+        if (!config) return ok(res, {});
+
+        // Nunca exponer el emailPassword al frontend
+        const { emailPassword, ...safeConfig } = config;
+        return ok(res, {
+            ...safeConfig,
+            tienePasswordConfigurada: !!emailPassword
+        });
     } catch (err) {
         next(err);
     }
@@ -14,14 +22,34 @@ export const get = async (req, res, next) => {
 
 export const update = async (req, res, next) => {
     try {
-        const { id, updatedAt, ...rest } = req.body;
+        const { 
+            id, updatedAt,
+            passwordApp,      // alias que usa el frontend
+            emailPassword: _ep, // ignorar si viene directamente (debe venir como passwordApp)
+            ...rest 
+        } = req.body;
+
+        const dataToSave = { ...rest };
+
+        // Solo actualizar la contraseña si el frontend mandó una nueva (no vacía)
+        if (passwordApp && passwordApp.trim() !== '') {
+            dataToSave.emailPassword = passwordApp.trim();
+        }
+
         const config = await prisma.configuracion.upsert({
             where: { id: 'singleton' },
-            create: { ...rest, id: 'singleton' },
-            update: rest
+            create: { ...dataToSave, id: 'singleton' },
+            update: dataToSave
         });
-        return ok(res, config);
+
+        // Devolver sin exponer la contraseña
+        const { emailPassword, ...safeConfig } = config;
+        return ok(res, {
+            ...safeConfig,
+            tienePasswordConfigurada: !!emailPassword
+        });
     } catch (err) {
         next(err);
     }
 };
+

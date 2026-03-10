@@ -2,6 +2,8 @@ import fs from 'fs';
 import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
 import * as pdfService from '../services/pdf.service.js';
+import { sendPlanEmail } from '../services/email.service.js';
+import { sendPlanWhatsApp } from '../services/whatsapp.service.js';
 
 export const getAll = async (req, res, next) => {
     try {
@@ -172,7 +174,17 @@ export const getById = async (req, res, next) => {
     try {
         const plan = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } }
+            include: { 
+                menus: { include: { tiemposComida: { include: { ingredientes: true } } } },
+                paciente: {
+                    include: {
+                        valoraciones: {
+                            orderBy: { fecha: 'desc' },
+                            take: 6
+                        }
+                    }
+                }
+            }
         });
         return ok(res, plan);
     } catch (err) {
@@ -284,9 +296,106 @@ export const update = async (req, res, next) => {
     }
 };
 
+const enrichPlanForPdf = async (plan, metaOverride = null) => {
+    let valoraciones = [];
+    if (plan.pacienteId) {
+        valoraciones = await prisma.valoracion.findMany({
+            where: { pacienteId: plan.pacienteId },
+            orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
+            take: 7,
+            select: { 
+                id: true,
+                fecha: true, 
+                pesoActual: true, 
+                estatura: true,
+                imc: true, 
+                pctGrasa2comp: true, 
+                pctGrasaCorp: true, 
+                masaMagra: true, 
+                numeroValoracion: true,
+                clasificacionIp: true,
+                clasifComplexion: true,
+                suplementacion: true,
+                barrido: {
+                    select: {
+                        kcalTotal: true
+                    }
+                }
+            }
+        });
+        
+        const historicoPlanes = await prisma.plan.findMany({
+            where: { pacienteId: plan.pacienteId },
+            orderBy: { fechaCreacion: 'desc' },
+            select: { calorias: true, valoracionId: true, fechaCreacion: true }
+        });
+
+        valoraciones = valoraciones.map(v => {
+            let energiaFinal = plan.calorias;
+            
+            if (v.barrido && v.barrido.kcalTotal) {
+                energiaFinal = v.barrido.kcalTotal;
+            } else {
+                let planAsignado = historicoPlanes.find(p => p.valoracionId === v.id);
+                if(!planAsignado) {
+                    planAsignado = historicoPlanes.find(p => new Date(p.fechaCreacion) >= new Date(v.fecha));
+                }
+                if (planAsignado) energiaFinal = planAsignado.calorias;
+            }
+
+            v.energia = energiaFinal;
+            v.somatotipo = v.clasifComplexion || v.clasificacionIp || "No definido";
+            return v;
+        });
+    }
+
+    let antecedentes = null;
+    let ultimaVal = valoraciones.length > 0 ? valoraciones[0] : null;
+
+    if (plan.pacienteId) {
+        antecedentes = await prisma.antecedentes.findUnique({
+            where: { pacienteId: plan.pacienteId }
+        });
+    }
+
+    plan.lineamientosRecientes = plan.notasGenerales ? plan.notasGenerales.split('\n').filter(n=>n.trim()) : [];
+    
+    plan.suplementacionReciente = [];
+    if (ultimaVal?.suplementacion) {
+        plan.suplementacionReciente.push(...ultimaVal.suplementacion.split('\n').filter(s=>s.trim()));
+    } else if (antecedentes?.recomendacionSuplementos) {
+        plan.suplementacionReciente.push(...antecedentes.recomendacionSuplementos.split('\n').filter(s=>s.trim()));
+    }
+
+    plan.hidratacionReciente = antecedentes?.agua ? [antecedentes.agua] : [];
+    
+    plan.alimentosPersonales = [];
+    if (antecedentes?.alimentosGustan) plan.alimentosPersonales.push("Preferencias: " + antecedentes.alimentosGustan);
+    if (antecedentes?.alimentosNoGustan) plan.alimentosPersonales.push("Evitar: " + antecedentes.alimentosNoGustan);
+    if (antecedentes?.alergias) plan.alimentosPersonales.push("Alergias: " + antecedentes.alergias);
+
+    if (!plan.pdfCustomMeta || typeof plan.pdfCustomMeta !== 'object') {
+        plan.pdfCustomMeta = {};
+    }
+    if (metaOverride) {
+        plan.pdfCustomMeta = { ...plan.pdfCustomMeta, ...metaOverride };
+    }
+
+    if (!plan.pdfCustomMeta.logoEctomorfo) plan.pdfCustomMeta.logoEctomorfo = "https://norder.mx/assets/ecto.png";
+    if (!plan.pdfCustomMeta.logoMesomorfo) plan.pdfCustomMeta.logoMesomorfo = "https://norder.mx/assets/meso.png";
+    if (!plan.pdfCustomMeta.logoEndomorfo) plan.pdfCustomMeta.logoEndomorfo = "https://norder.mx/assets/endo.png";
+
+    plan.smaeList = await prisma.alimentoSMAE.findMany({
+        where: { esPersonalizado: false },
+        orderBy: [{ grupo: 'asc' }, { nombre: 'asc' }]
+    });
+
+    return { planEnriquecido: plan, valoraciones };
+};
+
 export const generatePdf = async (req, res, next) => {
     try {
-        const plan = await prisma.plan.findUniqueOrThrow({
+        let planRow = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
             include: { 
                 paciente: true,
@@ -294,11 +403,13 @@ export const generatePdf = async (req, res, next) => {
             }
         });
 
-        const filePath = await pdfService.generarPlanPDF(plan);
+        const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow);
+
+        const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
         
-        const fileNamePart = plan.paciente 
-            ? plan.paciente.nombre.replace(/ /g, '_') 
-            : (plan.nombre || 'Plantilla').replace(/ /g, '_');
+        const fileNamePart = planEnriquecido.paciente 
+            ? planEnriquecido.paciente.nombre.replace(/ /g, '_') 
+            : (planEnriquecido.nombre || 'Plantilla').replace(/ /g, '_');
 
         // Configurar headers para que el navegador lo identifique como PDF y lo abra (inline)
         res.setHeader('Content-Type', 'application/pdf');
@@ -319,8 +430,47 @@ export const generatePdf = async (req, res, next) => {
 
         // Actualizar metadatos del plan (opcional, ya que es al vuelo)
         await prisma.plan.update({
-            where: { id: plan.id },
+            where: { id: planRow.id },
             data: { pdfGeneradoAt: new Date() }
+        });
+
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const generatePdfPreview = async (req, res, next) => {
+    try {
+        const metaOverride = req.body;
+        const planRow = await prisma.plan.findUniqueOrThrow({
+            where: { id: req.params.id },
+            include: { 
+                paciente: true,
+                menus: { include: { tiemposComida: { include: { ingredientes: true } } } } 
+            }
+        });
+
+        const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow, metaOverride);
+
+        console.log("PDF PREVIEW - Plan ID:", planRow.id, "Paciente ID:", planRow.pacienteId);
+        console.log("Valoraciones obtained:", valoraciones?.length);
+
+        const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
+        
+        const fileNamePart = planEnriquecido.paciente 
+            ? planEnriquecido.paciente.nombre.replace(/ /g, '_') 
+            : (planEnriquecido.nombre || 'Plantilla').replace(/ /g, '_');
+
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `inline; filename=Preview-${fileNamePart}.pdf`);
+
+        const stream = fs.createReadStream(filePath);
+        stream.pipe(res);
+
+        res.on('finish', () => {
+            try {
+                fs.unlinkSync(filePath);
+            } catch (unlinkErr) {}
         });
 
     } catch (err) {
@@ -331,25 +481,94 @@ export const generatePdf = async (req, res, next) => {
 export const sendPlan = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { metodo } = req.body; // 'whatsapp' o 'email'
 
-        if (metodo !== 'whatsapp') {
-            return error(res, 'Solo el método "whatsapp" está habilitado por el momento', 400);
+        // 1. Obtener plan completo con menus > tiempos > ingredientes
+        const planRow = await prisma.plan.findUniqueOrThrow({
+            where: { id },
+            include: {
+                menus: {
+                    include: {
+                        tiemposComida: {
+                            include: { ingredientes: true },
+                            orderBy: { orden: 'asc' }
+                        }
+                    },
+                    orderBy: { orden: 'asc' }
+                }
+            }
+        });
+
+        if (!planRow.pacienteId) {
+            return error(res, 'Este plan es una plantilla base y no tiene paciente asignado', 400);
         }
 
-        // Simulación: debido a que se eliminó el servicio de whatsapp como pedido,
-        // este endpoint marcará el estado ficticiamente sin enviar nada.
+        const paciente = await prisma.paciente.findUniqueOrThrow({
+            where: { id: planRow.pacienteId }
+        });
+
+        const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow);
+
+        // 4. Generar PDF con tabla de progreso enriquecida
+        const pdfBuffer = await pdfService.generarPlanPDFBuffer(planEnriquecido, paciente, valoraciones);
+
+        // 5. Enviar correo y WhatsApp mediante N8N Webhook
+        const nombreArchivo = `plan-${(planEnriquecido.nombre || 'alimenticio').replace(/ /g, '_')}.pdf`;
+        const webhookUrl = process.env.N8N_WEBHOOK_URL;
         
-        await prisma.plan.update({
+        let statusMensajes = 'no-definido';
+        
+        if (webhookUrl) {
+            try {
+                const formData = new FormData();
+                formData.append('pdfPlan', new Blob([pdfBuffer], { type: 'application/pdf' }), nombreArchivo);
+                formData.append('email', paciente.email || '');
+
+                // Sanitizar teléfono: solo dígitos, sin +, espacios ni guiones
+                // Si no tiene lada (menos de 11 dígitos para MX), agregar 52 por default
+                let telefonoLimpio = (paciente.telefono || '').replace(/\D/g, '');
+                if (telefonoLimpio && telefonoLimpio.length <= 10) {
+                    telefonoLimpio = '52' + telefonoLimpio; // agregar lada MX si falta
+                }
+                formData.append('telefono', telefonoLimpio);
+
+                formData.append('paciente_nombre', paciente.nombre || '');
+                formData.append('plan_nombre', planEnriquecido.nombre || '');
+
+                const response = await fetch(webhookUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (!response.ok) throw new Error(`Error N8N: ${response.statusText || response.status}`);
+                statusMensajes = 'ok';
+                console.log('[sendPlan] PDF y Meta-datos emitidos a N8N Webhook con éxito.');
+            } catch (err) {
+                console.error(`[sendPlan] Error emitiendo PDF a N8N:`, err.message);
+                statusMensajes = 'error';
+            }
+        } else {
+            console.warn('[sendPlan] Falló el envío porque N8N_WEBHOOK_URL no está definido en .env');
+        }
+
+        // 6. Marcar como enviado
+        const planActualizado = await prisma.plan.update({
             where: { id },
             data: { estadoEnvio: 'enviado', pdfGeneradoAt: new Date() }
         });
 
-        return ok(res, { message: 'Plan marcado como enviado (simulación sin WhatsApp)' });
+        return ok(res, {
+            message: 'Plan emitido hacia el orquestador correctamente',
+            orquestador: statusMensajes,
+            email: statusMensajes,     // frontend backward-compatibility
+            whatsapp: statusMensajes,  // frontend backward-compatibility
+            plan: planActualizado
+        });
+
     } catch (err) {
         next(err);
     }
 };
+
 
 export const updateEstado = async (req, res, next) => {
     try {
@@ -409,6 +628,7 @@ export const asignarPlan = async (req, res, next) => {
                 notasGenerales: original.notasGenerales,
                 estado: 'activo',
                 estadoEnvio: 'pendiente',
+                pdfCustomMeta: original.pdfCustomMeta,
                 valoracionId: req.body.valoracionId || original.valoracionId || null,
                 menus: {
                     create: original.menus.map(menu => ({
@@ -438,6 +658,22 @@ export const asignarPlan = async (req, res, next) => {
         });
         
         return ok(res, nuevo, 201);
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updatePdfMeta = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const meta = req.body;
+        
+        const plan = await prisma.plan.update({
+            where: { id },
+            data: { pdfCustomMeta: meta }
+        });
+        
+        return ok(res, plan);
     } catch (err) {
         next(err);
     }
