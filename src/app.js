@@ -10,6 +10,7 @@ BigInt.prototype.toJSON = function() {
 
 // Routes imports
 import authRoutes from './routes/auth.routes.js';
+import adminRoutes from './routes/admin.routes.js';
 import pacienteRoutes from './routes/pacientes.routes.js';
 import valoracionRoutes from './routes/valoraciones.routes.js';
 import revisionRoutes from './routes/revisiones.routes.js';
@@ -40,14 +41,22 @@ app.use('/temp', express.static('/tmp'));
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', service: 'norder HEALTH API' }));
 
+// Middlewares de protección (Cargado en cada ruta)
+import { authMiddleware, requireAdmin, requirePermiso } from './middlewares/auth.middleware.js';
+
 // API Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/pacientes', pacienteRoutes);
-app.use('/api/planes', planRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/configuracion', configuracionRoutes);
-app.use('/api/alimentos-smae', alimentosSMAERoutes);
-app.use('/api/pacientes/:pacienteId/valoraciones/:valoracionId/barrido', barridoRoutes);
+app.use('/api/auth', authRoutes); // Login/Auth no requiere protección JWT
+
+// Todas las rutas siguientes requieren autenticación
+app.use('/api/admin', adminRoutes); // El middleware está dentro para no bloquear el login
+app.use('/api/pacientes', authMiddleware, requirePermiso('pacientes', 'read'), pacienteRoutes);
+app.use('/api/planes', authMiddleware, requirePermiso('planes', 'read'), planRoutes);
+app.use('/api/dashboard', authMiddleware, requirePermiso('dashboard', 'read'), dashboardRoutes);
+app.use('/api/alimentos-smae', authMiddleware, requirePermiso('smae', 'read'), alimentosSMAERoutes);
+
+// Opcionales o específicos
+app.use('/api/configuracion', authMiddleware, configuracionRoutes);
+app.use('/api/pacientes/:pacienteId/valoraciones/:valoracionId/barrido', authMiddleware, requirePermiso('pacientes', 'write'), barridoRoutes);
 
 // 404 Handler for undefined routes
 app.use((req, res) => {

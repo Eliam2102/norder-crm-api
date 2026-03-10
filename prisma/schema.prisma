@@ -482,7 +482,7 @@ model BarridoEquivalencias {
 model AlimentoSMAE {
   id              String   @id @default(cuid())
   nombre          String
-  grupo           String   // verduras | frutas | cerealSinGr | cerealConGr | leguminosas | aoaMuyBajo | aoaBajo | aoaModerado | aoaAlto | lecheDesc | lecheSemi | lecheEntera | lecheAz | grasaSinProt | grasaConProt | azSinGr | azConGr
+  grupo           String
   pesoGramos      Float    @map("peso_gramos")
   porcionCasera   String?  @map("porcion_casera")
   cantidadPorcion Float?   @map("cantidad_porcion")
@@ -494,3 +494,21 @@ model AlimentoSMAE {
 
   @@map("alimento_smae")
 }
+
+// ─── Sistema de Usuarios / RBAC ─────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(uuid())
+  nombre        String
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  rol           String   @default("practicante")
+  permisos      Json     @default("{}")
+  activo        Boolean  @default(true)
+  telefono      String?
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  @@map("user")
+}
+
