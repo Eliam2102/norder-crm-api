@@ -2,114 +2,84 @@ import puppeteer from "puppeteer";
 import fs from "fs";
 import path from "path";
 import prisma from "../lib/prisma.js";
+import ejs from "ejs";
 
-export const generarPlanPDF = async (plan) => {
-  const { id, paciente, menus, proximaSesion } = plan;
+const ASSETS_DIR = path.join(process.cwd(), "src", "assets");
 
-  // Obtener configuración del nutricionista
-  let config = await prisma.configuracion.findUnique({ where: { id: "singleton" } });
-  if (!config) config = {};
+// Carga una imagen como data URI base64 para embederla en el PDF sin dependencias de rutas
+const loadImageAsBase64 = (filename) => {
+    const imgPath = path.join(ASSETS_DIR, filename);
+    if (!fs.existsSync(imgPath)) return null;
+    const ext = path.extname(filename).replace('.', '').toLowerCase();
+    const mime = ext === 'svg' ? 'image/svg+xml' : `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+    const data = fs.readFileSync(imgPath).toString('base64');
+    return `data:${mime};base64,${data}`;
+};
 
-  const fechaSesion = proximaSesion
-    ? new Date(proximaSesion).toLocaleDateString("es-MX", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      })
-    : "Pendiente";
+const renderHTML = async (plan, paciente, config, valoraciones = []) => {
+    const templatePath = path.join(process.cwd(), "src", "templates", "plan.ejs");
+    
+    const html = await ejs.renderFile(templatePath, {
+        plan,
+        paciente,
+        config,
+        valoraciones,
+        // Imágenes de activos embebidas como base64 para que Puppeteer las renderice correctamente
+        tiposCuerpoImg: loadImageAsBase64("tipos_cuerpo.png"),
+    });
+    
+    return html;
+};
 
-  // HTML Template
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <style>
-            @page { margin: 20mm; }
-            body { font-family: Arial, sans-serif; font-size: 10pt; color: #000; margin: 0; padding: 20px; }
-            .header { display: flex; justify-content: space-between; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-            .header-logo { font-size: 24pt; font-weight: bold; }
-            .header-logo span { font-size: 8pt; display: block; color: #666; letter-spacing: 3px; }
-            .header-info { text-align: right; font-size: 8pt; line-height: 1.6; }
-            .menus { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #000; }
-            .menu { padding: 10px; border-right: 1px solid #000; }
-            .menu:last-child { border-right: none; }
-            .menu-titulo { font-weight: bold; text-align: center; font-size: 10pt; border-bottom: 1px solid #ccc; padding-bottom: 6px; margin-bottom: 8px; }
-            .tiempo { margin-bottom: 10px; }
-            .tiempo-nombre { font-weight: bold; text-transform: uppercase; font-size: 9pt; }
-            .ingrediente { margin-left: 12px; font-size: 9pt; line-height: 1.5; }
-            .ingrediente::before { content: "– "; }
-            .nota-pie { font-size: 8.5pt; color: #333; margin-top: 4px; }
-            .footer { margin-top: 16px; text-align: right; font-size: 10pt; border-top: 1px solid #ccc; padding-top: 8px; }
-            .footer strong { font-size: 11pt; }
-            .patient-header { margin-bottom: 15px; font-size: 10pt; }
-        </style>
-    </head>
-    <body>
-        <div class="header">
-          <div class="header-logo">
-            NORER<span>THINK · EAT · LIVE</span>
-          </div>
-          <div class="header-info">
-            ${config.nombre || process.env.NUTRICIONISTA_NOMBRE || "L.N. Eyder Méndez Gamboa"}<br>
-            ${config.profesion || ""} ${config.cedula ? `| Cédula: ${config.cedula}` : ""}${config.universidad ? `<br>${config.universidad}` : ""}<br>
-            ${config.certificacion || process.env.NUTRICIONISTA_CERTIFICACION || "Certificación ISAK Nivel 2"}<br>
-            ${config.telefono || process.env.NUTRICIONISTA_TELEFONO || "999 365 7830"} | ${config.email || process.env.NUTRICIONISTA_EMAIL || "eyder@norer.mx"}<br>
-            ${config.direccion || process.env.NUTRICIONISTA_DIRECCION || "Mérida, Yucatán, México"}
-          </div>
-        </div>
+const launchBrowser = async () => {
+    return puppeteer.launch({
+        headless: "new",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+};
 
-        <div class="patient-header">
-            <p><strong>Paciente:</strong> ${paciente ? paciente.nombre : "Plantilla Base"} — <strong>Fecha Plan:</strong> ${new Date(plan.fechaCreacion).toLocaleDateString("es-MX")}</p>
-        </div>
+/**
+ * Genera el PDF y lo guarda en /tmp. Devuelve la ruta del archivo.
+ * Usado por el endpoint GET /planes/:id/pdf (streaming al browser).
+ */
+export const generarPlanPDF = async (plan, valoraciones = []) => {
+    const { id, paciente } = plan;
 
-        <div class="menus">
-          ${menus
-            .map(
-              (menu) => `
-            <div class="menu">
-              <div class="menu-titulo">${menu.nombre}</div>
-              ${menu.tiemposComida
-                .map(
-                  (t) => `
-                <div class="tiempo">
-                  <div class="tiempo-nombre">${t.nombre}</div>
-                  ${t.ingredientes
-                    .map(
-                      (i) => `
-                    <div class="ingrediente">
-                      ${i.descripcion}${i.cantidad ? ` ${i.cantidad}` : ""}${i.unidad ? ` ${i.unidad}` : ""}${i.eqCantidad ? ` – ${i.eqCantidad} eq ${i.eqGrupo || ""}` : ""}${i.nota ? ` (${i.nota})` : ""}
-                    </div>
-                  `,
-                    )
-                    .join("")}
-                  ${t.notaPie ? `<div class="nota-pie">${t.notaPie}</div>` : ""}
-                </div>
-              `,
-                )
-                .join("")}
-            </div>
-          `,
-            )
-            .join("")}
-        </div>
-        <div class="footer">
-          <strong>Próxima sesión: ${fechaSesion}</strong>
-          ${plan.notasGenerales ? `<p style="font-size:8.5pt;color:#333;margin-top:6px;">${plan.notasGenerales}</p>` : ""}
-        </div>
-    </body>
-    </html>
-    `;
+    let config = await prisma.configuracion.findUnique({ where: { id: "singleton" } });
+    if (!config) config = {};
 
-  const browser = await puppeteer.launch({
-    headless: "new",
-    args: ["--no-sandbox"],
-  });
-  const page = await browser.newPage();
-  await page.setContent(html);
+    const html = await renderHTML(plan, paciente, config, valoraciones);
 
-  const filePath = path.join("/tmp", `plan-${id}.pdf`);
-  await page.pdf({ path: filePath, format: "A4" });
+    const browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
 
-  await browser.close();
-  return filePath;
+    const filePath = path.join("/tmp", `plan-${id}.pdf`);
+    await page.pdf({ path: filePath, format: "A4", landscape: true });
+
+    await browser.close();
+    return filePath;
+};
+
+/**
+ * Genera el PDF en memoria como Buffer.
+ * Usado por el endpoint POST /planes/:id/enviar (envío por email y WhatsApp).
+ * @param {object} plan - Plan completo con menus
+ * @param {object} paciente - Datos del paciente
+ * @param {Array}  valoraciones - Últimas valoraciones para tabla de progreso
+ */
+export const generarPlanPDFBuffer = async (plan, paciente, valoraciones = []) => {
+    let config = await prisma.configuracion.findUnique({ where: { id: "singleton" } });
+    if (!config) config = {};
+
+    const html = await renderHTML(plan, paciente, config, valoraciones);
+
+    const browser = await launchBrowser();
+    const page = await browser.newPage();
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+
+    const pdfBuffer = await page.pdf({ format: "A4", landscape: true });
+
+    await browser.close();
+    return pdfBuffer;
 };
