@@ -4,9 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 model Paciente {
@@ -208,7 +206,7 @@ model Valoracion {
   suplementacion          String?  @map("suplementacion")
   createdAt               DateTime @default(now()) @map("created_at")
 
-  paciente        Paciente          @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  paciente        Paciente              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   temarioConsulta TemarioConsulta[]
   revisiones      Revision[]
   planes          Plan[]
@@ -465,15 +463,15 @@ model Configuracion {
 }
 
 model BarridoEquivalencias {
-  id            String     @id @default(uuid())
-  pacienteId    String     @map("paciente_id")
-  valoracionId  String     @unique @map("valoracion_id")
-  tiempos       String     // JSON array: ["Snack", "Desayuno", ...]
-  porciones     String     // JSON: { "frutas": 6, ... }
-  distribucion  String     // JSON: { "Desayuno": { "frutas": 3, ... }, ... }
+  id            String   @id @default(uuid())
+  pacienteId    String   @map("paciente_id")
+  valoracionId  String   @unique @map("valoracion_id")
+  tiempos       String // JSON array: ["Snack", "Desayuno", ...]
+  porciones     String // JSON: { "frutas": 6, ... }
+  distribucion  String // JSON: { "Desayuno": { "frutas": 3, ... }, ... }
   kcalTotal     Float?
-  creadoEn      DateTime   @default(now()) @map("creado_en")
-  actualizadoEn DateTime   @updatedAt @map("actualizado_en")
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
   paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
@@ -513,4 +511,3 @@ model User {
 
   @@map("user")
 }
-
