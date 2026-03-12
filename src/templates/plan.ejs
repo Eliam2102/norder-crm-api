@@ -334,14 +334,22 @@
             <div class="menu-col">
                 <div class="menu-time">
                     <%= tName %>
-                    <% if(tMenu1 && tMenu1.nombre.includes('.')) { %>
-                        <span class="menu-time-subtitle"><%= tMenu1.nombre.substring(tMenu1.nombre.indexOf('.') + 1).trim() %></span>
-                    <% } %>
                     <% if(meta[`menu1_titulo`]) { %> <%= meta[`menu1_titulo`] %> <% } %>
                 </div>
                 
-                <% if(tMenu1 && tMenu1.ingredientes) { %>
-                    <% tMenu1.ingredientes.forEach(ing => { %>
+                <% if(tMenu1 && tMenu1.ingredientes && tMenu1.ingredientes.length > 0) { 
+                    const grouped1 = {};
+                    tMenu1.ingredientes.forEach(ing => {
+                        const plat = ing.platillo || '';
+                        if(!grouped1[plat]) grouped1[plat] = [];
+                        grouped1[plat].push(ing);
+                    });
+                    
+                    Object.keys(grouped1).forEach(plat => {
+                        if (plat && !meta.soloEquivalencias) { %>
+                            <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                        <% }
+                        grouped1[plat].forEach(ing => { %>
                         <div class="menu-item">
                             <% if (meta.soloEquivalencias) { %>
                                 <% if(ing.eqCantidad && ing.eqGrupo) { %>
@@ -354,7 +362,8 @@
                                 <% } %>
                             <% } %>
                         </div>
-                    <% }); %>
+                    <%  });
+                    }); %>
                 <% } else { %>
                     <div class="menu-item text-center" style="color:#aaa; font-style:italic; margin-top:20px;">Sin platillo</div>
                 <% } %>
@@ -368,14 +377,22 @@
             <div class="menu-col">
                 <div class="menu-time">
                     <%= tName %>
-                    <% if(tMenu2 && tMenu2.nombre.includes('.')) { %>
-                        <span class="menu-time-subtitle"><%= tMenu2.nombre.substring(tMenu2.nombre.indexOf('.') + 1).trim() %></span>
-                    <% } %>
                     <% if(meta[`menu2_titulo`]) { %> <%= meta[`menu2_titulo`] %> <% } %>
                 </div>
                 
-                <% if(tMenu2 && tMenu2.ingredientes) { %>
-                    <% tMenu2.ingredientes.forEach(ing => { %>
+                <% if(tMenu2 && tMenu2.ingredientes && tMenu2.ingredientes.length > 0) { 
+                    const grouped2 = {};
+                    tMenu2.ingredientes.forEach(ing => {
+                        const plat = ing.platillo || '';
+                        if(!grouped2[plat]) grouped2[plat] = [];
+                        grouped2[plat].push(ing);
+                    });
+                    
+                    Object.keys(grouped2).forEach(plat => {
+                        if (plat && !meta.soloEquivalencias) { %>
+                            <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                        <% }
+                        grouped2[plat].forEach(ing => { %>
                         <div class="menu-item">
                             <% if (meta.soloEquivalencias) { %>
                                 <% if(ing.eqCantidad && ing.eqGrupo) { %>
@@ -388,7 +405,8 @@
                                 <% } %>
                             <% } %>
                         </div>
-                    <% }); %>
+                    <%  });
+                    }); %>
                 <% } else { %>
                     <div class="menu-item text-center" style="color:#aaa; font-style:italic; margin-top:20px;">Sin platillo</div>
                 <% } %>

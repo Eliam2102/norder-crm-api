@@ -150,7 +150,8 @@ export const create = async (req, res, next) => {
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     nota: iData.nota || '',
-                                    orden: iIdx + 1
+                                    orden: iIdx + 1,
+                                    platillo: iData.platillo || ''
                                 }
                             });
                         }
@@ -276,7 +277,8 @@ export const update = async (req, res, next) => {
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     nota: iData.nota || '',
-                                    orden: iIdx + 1
+                                    orden: iIdx + 1,
+                                    platillo: iData.platillo || ''
                                 } 
                             });
                         }
@@ -647,7 +649,8 @@ export const asignarPlan = async (req, res, next) => {
                                         eqCantidad: i.eqCantidad,
                                         eqGrupo: i.eqGrupo,
                                         nota: i.nota,
-                                        orden: i.orden
+                                        orden: i.orden,
+                                        platillo: i.platillo
                                     }))
                                 }
                             }))
