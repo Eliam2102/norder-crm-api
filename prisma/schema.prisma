@@ -344,6 +344,7 @@ model PlanIngrediente {
   eqGrupo        String?  @map("eq_grupo")
   nota           String?
   orden          Int      @default(1)
+  platillo       String?  @default("")
 
   tiempoComida PlanTiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
 
