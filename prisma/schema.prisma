@@ -4,7 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Paciente {
@@ -16,6 +18,7 @@ model Paciente {
   fechaNacimiento      DateTime  @map("fecha_nacimiento") @db.Date
   sexo                 String
   estatura             Decimal?  @db.Decimal(12, 4)
+  peso                 Decimal?  @db.Decimal(12, 4)
   complexion           Decimal?  @db.Decimal(5, 2)
   fechaRegistro        DateTime  @default(now()) @map("fecha_registro")
   nivelMembresia       String    @default("ninguna") @map("nivel_membresia")
@@ -344,7 +347,6 @@ model PlanIngrediente {
   eqGrupo        String?  @map("eq_grupo")
   nota           String?
   orden          Int      @default(1)
-  platillo       String?  @default("")
 
   tiempoComida PlanTiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
 

@@ -25,18 +25,62 @@ export const getAll = async (req, res, next) => {
                         { fecha: 'desc' },
                         { numeroValoracion: 'desc' }
                     ],
-                    take: 1
+                    include: {
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true } }
+                    }
                 },
                 planes: {
-                    where: { estado: 'activo' },
-                    orderBy: { fechaCreacion: 'desc' },
-                    take: 1
+                    orderBy: { fechaCreacion: 'desc' }
                 }
             },
             orderBy: { nombre: 'asc' }
         });
 
-        return ok(res, pacientes);
+        // Mapeo profundo para soportar la vista de "Pendientes" y otros estados
+        const mapped = pacientes.map(p => {
+            const valoraciones = p.valoraciones.map(v => {
+                const planAsociado = p.planes.find(pl => pl.valoracionId === v.id);
+                
+                // Detección real de barrido (kcal > 0 o porciones > 0)
+                let hasBarrido = false;
+                if (v.barrido) {
+                    if ((v.barrido.kcalTotal || 0) > 0) {
+                        hasBarrido = true;
+                    } else {
+                        try {
+                            const pJson = JSON.parse(v.barrido.porciones || '{}');
+                            hasBarrido = Object.values(pJson).some(val => Number(val) > 0);
+                        } catch (e) {}
+                    }
+                }
+
+                // Estado de flujo interno
+                let estadoFlujo = 'Enviado'; 
+                if (!planAsociado) {
+                    estadoFlujo = hasBarrido ? 'Plan en Proceso' : 'Pendiente de plan';
+                } else if (planAsociado.estadoEnvio === 'pendiente') {
+                    estadoFlujo = 'Listo para enviar';
+                }
+
+                return {
+                    ...v,
+                    hasBarrido,
+                    estadoFlujo,
+                    planId: planAsociado?.id || null,
+                    estadoEnvio: planAsociado?.estadoEnvio || null
+                };
+            });
+
+            return {
+                ...p,
+                valoraciones,
+                // Compatibilidad con vistas que solo esperan un objeto de valoracion/plan
+                ultimaValoracion: valoraciones[0] || null,
+                ultimoPlan: p.planes[0] || null
+            };
+        });
+
+        return ok(res, mapped);
     } catch (err) {
         next(err);
     }
@@ -145,7 +189,11 @@ export const getById = async (req, res, next) => {
                         { fecha: 'desc' },
                         { numeroValoracion: 'desc' }
                     ], 
-                    include: { temarioConsulta: true, planes: { take: 1, orderBy: { fechaCreacion: 'desc' } } } 
+                    include: { 
+                        temarioConsulta: true, 
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true } },
+                        planes: { take: 1, orderBy: { fechaCreacion: 'desc' } } 
+                    } 
                 },
                 planes: { orderBy: { fechaCreacion: 'desc' } },
                 revisiones: { orderBy: { fecha: 'desc' } }
@@ -154,10 +202,38 @@ export const getById = async (req, res, next) => {
 
         const { datosEjercicio: de, consumoCalorico: cc, antecedentes: ant, valoraciones: val, ...rest } = paciente;
         
-        // Map valoraciones to include a singular plan object
+        // Mapeo de valoraciones con lógica de estados de flujo
         const valoracionesMapped = val.map(v => {
-            const { planes, ...vRest } = v;
-            return { ...vRest, plan: planes[0] || null };
+            const { planes, barrido, ...vRest } = v;
+            const planAsociado = planes[0] || null;
+            
+            // Detección real de barrido
+            let hasBarrido = false;
+            if (barrido) {
+                if ((barrido.kcalTotal || 0) > 0) hasBarrido = true;
+                else {
+                    try {
+                        const pJson = JSON.parse(barrido.porciones || '{}');
+                        hasBarrido = Object.values(pJson).some(val => Number(val) > 0);
+                    } catch (e) {}
+                    }
+            }
+
+            // Estado de flujo
+            let estadoFlujo = 'Enviado';
+            if (!planAsociado) {
+                estadoFlujo = hasBarrido ? 'Plan en Proceso' : 'Pendiente de plan';
+            } else if (planAsociado.estadoEnvio === 'pendiente') {
+                estadoFlujo = 'Listo para enviar';
+            }
+
+            return { 
+                ...vRest, 
+                plan: planAsociado,
+                barrido,
+                hasBarrido,
+                estadoFlujo
+            };
         });
 
         const mapped = { 
@@ -249,8 +325,10 @@ export const update = async (req, res, next) => {
             // Non-schema fields from components
             edad,
             talla,
+            tallas,
             talllas,
             objetivo,
+            peso,
             ...data 
         } = req.body;
 
@@ -393,7 +471,8 @@ export const remove = async (req, res, next) => {
         const { id } = req.params;
 
         // Seguridad: Verificar rol de administrador
-        if (req.user?.role !== 'admin') {
+        const userRol = req.user?.rol || req.user?.role;
+        if (userRol !== 'admin') {
             return error(res, 'No tienes permisos para eliminar pacientes', 403);
         }
 
