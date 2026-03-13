@@ -157,11 +157,21 @@ export const getAlertas = async (req, res, next) => {
         const ahora = new Date();
         
         const pacientes = await prisma.paciente.findMany({
-            include: {
+            select: {
+                id: true,
+                nombre: true,
+                apellido: true,
                 antecedentes: { select: { patologia: true } },
                 valoraciones: {
                     orderBy: { fecha: 'desc' },
-                    select: { id: true, fecha: true, deficitMusculo: true, createdAt: true }
+                    select: {
+                        id: true,
+                        fecha: true,
+                        numeroValoracion: true,
+                        pesoActual: true,
+                        hora: true,
+                        barrido: { select: { id: true, kcalTotal: true } }
+                    }
                 },
                 planes: {
                     select: { id: true, valoracionId: true, estadoEnvio: true, nombre: true, fechaCreacion: true }
@@ -169,6 +179,8 @@ export const getAlertas = async (req, res, next) => {
             }
         });
  
+        console.log('DEBUG DASHBOARD PACIENTES:', JSON.stringify(pacientes, null, 2));
+
         const alertasRaw = [];
 
         pacientes.forEach(p => {
@@ -176,26 +188,40 @@ export const getAlertas = async (req, res, next) => {
             p.valoraciones.forEach(v => {
                 const planAsociado = p.planes.find(pl => pl.valoracionId === v.id);
                 const diasSinVisitaVal = Math.floor(Math.abs(ahora - new Date(v.fecha)) / (1000 * 60 * 60 * 24));
-                
+                const pesoVal = v.pesoActual ? parseFloat(v.pesoActual.toString()) : null;
+
                 if (!planAsociado) {
+                    // Si tiene el objeto barrido pero sin kcal, lo tratamos como vacío
+                    const hasBarrido = v.barrido && parseFloat(v.barrido.kcalTotal || 0) > 0;
+                    const tipoRiesgo = hasBarrido ? 'Plan en Proceso' : 'Pendiente de plan';
+                    
                     alertasRaw.push({
                         pacienteId: p.id,
-                        nombre: p.nombre,
+                        valoracionId: v.id,
+                        nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
                         diasSinVisita: diasSinVisitaVal,
-                        tipoRiesgo: 'Sin Plan Asignado',
+                        tipoRiesgo,
                         prioridad: 'Alta',
                         ultimoContacto: v.fecha,
-                        fechaPlan: v.fecha // Reference date
+                        fechaPlan: v.fecha,
+                        numeroValoracion: v.numeroValoracion,
+                        peso: pesoVal,
+                        hora: v.hora
                     });
                 } else if (planAsociado.estadoEnvio === 'pendiente') {
                     alertasRaw.push({
                         pacienteId: p.id,
-                        nombre: p.nombre,
+                        valoracionId: v.id,
+                        planId: planAsociado.id,
+                        nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
                         diasSinVisita: diasSinVisitaVal,
-                        tipoRiesgo: 'Plan Sin Enviar',
+                        tipoRiesgo: 'Listo para enviar',
                         prioridad: 'Alta',
                         ultimoContacto: v.fecha,
-                        fechaPlan: planAsociado.fechaCreacion
+                        fechaPlan: planAsociado.fechaCreacion,
+                        numeroValoracion: v.numeroValoracion,
+                        peso: pesoVal,
+                        hora: v.hora
                     });
                 }
             });
@@ -221,7 +247,7 @@ export const getAlertas = async (req, res, next) => {
                 if (tipoRiesgo !== 'Ninguno') {
                     alertasRaw.push({
                         pacienteId: p.id,
-                        nombre: p.nombre,
+                        nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
                         diasSinVisita,
                         tipoRiesgo,
                         prioridad,
@@ -236,9 +262,9 @@ export const getAlertas = async (req, res, next) => {
         .filter(a => a.tipoRiesgo !== 'Ninguno')
         .sort((a, b) => {
             const scorePrioridad = { 'Alta': 3, 'Media': 2, 'Baja': 1 };
-            // Dar prioridad absoluta a los pendientes de Eyder
-            const isEyderA = a.tipoRiesgo === 'Sin Plan Asignado' || a.tipoRiesgo === 'Plan Sin Enviar';
-            const isEyderB = b.tipoRiesgo === 'Sin Plan Asignado' || b.tipoRiesgo === 'Plan Sin Enviar';
+            // Prioridad absoluta a los pendientes de flujo nutricional (Fase 2, 3 y 4)
+            const isEyderA = ['Falta Equivalencias', 'Sin Plan Asignado', 'Plan Sin Enviar'].includes(a.tipoRiesgo);
+            const isEyderB = ['Falta Equivalencias', 'Sin Plan Asignado', 'Plan Sin Enviar'].includes(b.tipoRiesgo);
             
             if (isEyderA && !isEyderB) return -1;
             if (isEyderB && !isEyderA) return 1;
@@ -268,7 +294,7 @@ export const getTopClientes = async (req, res, next) => {
 
         return ok(res, top.map(p => ({
             id: p.id,
-            nombre: `${p.nombre}${p.apellido ? ' ' + p.apellido : ''}`.trim(),
+            nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
             valoraciones: p._count.valoraciones,
             nivelMembresia: p.nivelMembresia,
             email: p.email,

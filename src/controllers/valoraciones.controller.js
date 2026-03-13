@@ -8,6 +8,7 @@ export const getAll = async (req, res, next) => {
             where: { pacienteId },
             include: { 
                 temarioConsulta: true,
+                barrido: { select: { id: true, kcalTotal: true, porciones: true } },
                 planes: {
                     select: {
                         id: true,
@@ -27,11 +28,35 @@ export const getAll = async (req, res, next) => {
         });
 
         return ok(res, valoraciones.map(v => {
-            const { planes, ...rest } = v;
+            const { planes, barrido, ...rest } = v;
             // The plan for this specific valoracion is the one where valoracionId === v.id
             const specificPlan = planes.find(p => p.valoracionId === v.id);
+
+            // Detección real de barrido
+            let hasBarrido = false;
+            if (barrido) {
+                if ((barrido.kcalTotal || 0) > 0) hasBarrido = true;
+                else {
+                    try {
+                        const pJson = JSON.parse(barrido.porciones || '{}');
+                        hasBarrido = Object.values(pJson).some(val => Number(val) > 0);
+                    } catch (e) {}
+                }
+            }
+
+            // Estado de flujo
+            let estadoFlujo = 'Enviado';
+            if (!specificPlan) {
+                estadoFlujo = hasBarrido ? 'Plan en Proceso' : 'Pendiente de plan';
+            } else if (specificPlan.estadoEnvio === 'pendiente') {
+                estadoFlujo = 'Listo para enviar';
+            }
+
             return { 
                 ...rest, 
+                barrido,
+                hasBarrido,
+                estadoFlujo,
                 plan: specificPlan || null,
                 planId: specificPlan?.id || null 
             };

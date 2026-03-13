@@ -150,8 +150,7 @@ export const create = async (req, res, next) => {
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     nota: iData.nota || '',
-                                    orden: iIdx + 1,
-                                    platillo: iData.platillo || ''
+                                    orden: iIdx + 1
                                 }
                             });
                         }
@@ -277,8 +276,7 @@ export const update = async (req, res, next) => {
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     nota: iData.nota || '',
-                                    orden: iIdx + 1,
-                                    platillo: iData.platillo || ''
+                                    orden: iIdx + 1
                                 } 
                             });
                         }
@@ -301,10 +299,10 @@ export const update = async (req, res, next) => {
 const enrichPlanForPdf = async (plan, metaOverride = null) => {
     let valoraciones = [];
     if (plan.pacienteId) {
-        valoraciones = await prisma.valoracion.findMany({
+        let rawValoraciones = await prisma.valoracion.findMany({
             where: { pacienteId: plan.pacienteId },
             orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
-            take: 7,
+            take: 20, // Tomamos más para garantizar 7 únicas después de de-duplicar
             select: { 
                 id: true,
                 fecha: true, 
@@ -322,9 +320,21 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                     select: {
                         kcalTotal: true
                     }
+                },
+                paciente: {
+                    select: {
+                        datosEjercicio: {
+                            select: {
+                                objetivo: true
+                            }
+                        }
+                    }
                 }
             }
         });
+        
+        // Ya no de-duplicamos por fecha. Solo mostramos las últimas 7.
+        valoraciones = rawValoraciones.slice(0, 7);
         
         const historicoPlanes = await prisma.plan.findMany({
             where: { pacienteId: plan.pacienteId },
@@ -347,6 +357,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
             v.energia = energiaFinal;
             v.somatotipo = v.clasifComplexion || v.clasificacionIp || "No definido";
+            v.objetivo = v.paciente?.datosEjercicio?.objetivo || "Estético";
             return v;
         });
     }
@@ -649,8 +660,7 @@ export const asignarPlan = async (req, res, next) => {
                                         eqCantidad: i.eqCantidad,
                                         eqGrupo: i.eqGrupo,
                                         nota: i.nota,
-                                        orden: i.orden,
-                                        platillo: i.platillo
+                                        orden: i.orden
                                     }))
                                 }
                             }))
