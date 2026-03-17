@@ -89,7 +89,7 @@ export const getAll = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const { 
-            nombre, sexo, fechaNacimiento, email, telefono, tallas, complexion, talla,
+            nombre, apellido, sexo, fechaNacimiento, email, telefono, tallas, complexion, talla,
             ejercicio, datosEjercicio,
             antecedentes,
             habitos, consumoCalorico,
@@ -108,11 +108,14 @@ export const create = async (req, res, next) => {
         const nuevo = await prisma.paciente.create({
             data: {
                 nombre,
+                apellido: apellido || null,
                 sexo,
                 fechaNacimiento: new Date(fechaNacimiento),
                 email,
                 telefono: telefono || null,
                 estatura: estaturaVal ? parseFloat(estaturaVal) : null,
+                // peso y complexion se leen del root del payload
+                peso: req.body.peso != null && req.body.peso !== '' ? parseFloat(req.body.peso) : null,
                 complexion: complexion ? parseFloat(complexion) : null,
                 datosEjercicio: {
                     create: {
