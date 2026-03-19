@@ -309,12 +309,17 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 pesoActual: true, 
                 estatura: true,
                 imc: true, 
-                pctGrasa2comp: true, 
-                pctGrasaCorp: true, 
+                pctGrasaCorp: true,
+                pctGrasa2comp: true,
                 masaMagra: true, 
+                masaGrasaReal: true,
+                kgGrasa2comp: true,
                 numeroValoracion: true,
                 clasificacionIp: true,
                 clasifComplexion: true,
+                endomorfico: true,
+                mesomorfico: true,
+                ectomorfico: true,
                 suplementacion: true,
                 barrido: {
                     select: {
@@ -323,6 +328,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 },
                 paciente: {
                     select: {
+                        complexion: true,
                         datosEjercicio: {
                             select: {
                                 objetivo: true
@@ -343,22 +349,63 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         });
 
         valoraciones = valoraciones.map(v => {
+            const vObj = { ...v };
+            
+            // Helper for Decimal to Number conversion
+            const toNum = (val) => {
+                if (val == null) return null;
+                const n = Number(val);
+                return isNaN(n) ? null : n;
+            };
+
+            // Mapping results with appropriate fallbacks
+            vObj.pesoActual = toNum(v.pesoActual);
+            vObj.estatura = toNum(v.estatura);
+            vObj.imc = toNum(v.imc);
+            
+            // Fat fallbacks: 4-comp -> 2-comp
+            vObj.pctGrasaCorp = toNum(v.pctGrasaCorp) ?? toNum(v.pctGrasa2comp);
+            vObj.masaGrasaReal = toNum(v.masaGrasaReal) ?? toNum(v.kgGrasa2comp);
+            vObj.masaMagra = toNum(v.masaMagra);
+
             let energiaFinal = plan.calorias;
             
+            // Prioridad de energía: Ajuste manual en Barrido > Plan asignado > Plan actual del paciente
             if (v.barrido && v.barrido.kcalTotal) {
                 energiaFinal = v.barrido.kcalTotal;
             } else {
                 let planAsignado = historicoPlanes.find(p => p.valoracionId === v.id);
-                if(!planAsignado) {
+                if (!planAsignado) {
                     planAsignado = historicoPlanes.find(p => new Date(p.fechaCreacion) >= new Date(v.fecha));
                 }
                 if (planAsignado) energiaFinal = planAsignado.calorias;
             }
 
-            v.energia = energiaFinal;
-            v.somatotipo = v.clasifComplexion || v.clasificacionIp || "No definido";
-            v.objetivo = v.paciente?.datosEjercicio?.objetivo || "Estético";
-            return v;
+            vObj.energia = toNum(energiaFinal);
+            
+            // Mapeo de Somatotipo con Fallback según requerimiento
+            const hasEndoMesoEcto = v.endomorfico != null || v.mesomorfico != null || v.ectomorfico != null;
+            
+            if (hasEndoMesoEcto) {
+                // 1. Somatotipo calculado (Endo-Meso-Ecto)
+                const comps = [
+                    v.endomorfico != null ? `${v.endomorfico}` : '?',
+                    v.mesomorfico != null ? `${v.mesomorfico}` : '?',
+                    v.ectomorfico != null ? `${v.ectomorfico}` : '?'
+                ];
+                vObj.somatotipo = comps.join('-');
+            } else if (v.clasifComplexion || v.clasificacionIp) {
+                // 2. Clasificación directa (Complexión o IP)
+                vObj.somatotipo = v.clasifComplexion || v.clasificacionIp;
+            } else {
+                // 3. Fallback a complexión del perfil del paciente (1: Ectomorfo, 2: Mesomorfo, 3: Endomorfo)
+                const compPaciente = toNum(v.paciente?.complexion);
+                const mapping = { 1: "Ectomorfo", 2: "Mesomorfo", 3: "Endomorfo" };
+                vObj.somatotipo = mapping[Math.round(compPaciente)] || "No definido";
+            }
+
+            vObj.objetivo = v.paciente?.datosEjercicio?.objetivo || "Estético";
+            return vObj;
         });
     }
 

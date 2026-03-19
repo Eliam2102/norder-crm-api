@@ -42,6 +42,12 @@
             letter-spacing: -1px;
             line-height: 1;
         }
+        .header-logo img {
+            width: 140px;
+            height: auto;
+            object-fit: contain;
+            display: block;
+        }
         .header-logo span {
             display: block;
             font-size: 10px;
@@ -191,8 +197,7 @@
     const headerHTML = `
         <div class="header">
             <div class="header-logo">
-                NORDER
-                <span>THINK · EAT · LIVE</span>
+                ${logoMenuImg ? '<img src="' + logoMenuImg + '" alt="Norder">' : 'NORDER<span>THINK · EAT · LIVE</span>'}
             </div>
             <div class="header-info">
                 <strong>L.N. Eyder Méndez Gamboa</strong><br>
@@ -240,32 +245,32 @@
                 <tr><td colspan="8" class="font-bold text-center">Resultados Generales</td></tr>
                 <tr>
                     <td class="font-bold">Peso</td>
-                    <% cols.forEach(c => { %><td><%= c && c.pesoActual ? c.pesoActual : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.pesoActual != null) ? c.pesoActual : '' %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Talla (cm)</td>
-                    <% cols.forEach(c => { %><td><%= c && c.estatura ? c.estatura : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.estatura != null) ? c.estatura : '' %></td><% }); %>
                 </tr>
                 <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
                 <tr>
                     <td class="font-bold">% Grasa</td>
-                    <% cols.forEach(c => { %><td><%= c && c.pctGrasaCorp ? c.pctGrasaCorp : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.pctGrasaCorp != null) ? c.pctGrasaCorp : '' %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Kg Grasa</td>
-                    <% cols.forEach(c => { %><td><%= c && c.masaGrasaReal ? c.masaGrasaReal : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.masaGrasaReal != null) ? c.masaGrasaReal : '' %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Kg MLG</td>
-                    <% cols.forEach(c => { %><td><%= c && c.masaMagra ? c.masaMagra : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.masaMagra != null) ? c.masaMagra : '' %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Somatotipo</td>
-                    <% cols.forEach(c => { %><td><%= c && c.somatotipo ? c.somatotipo : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Energía(kcal)</td>
-                    <% cols.forEach(c => { %><td><%= c && c.energia ? c.energia : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
                 </tr>
             </table>
 
