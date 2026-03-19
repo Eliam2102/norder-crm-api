@@ -96,13 +96,23 @@ export const create = async (req, res, next) => {
             ...rest 
         } = req.body;
 
+        const pesoVal = rest.pesoActual ?? (peso ? parseFloat(peso) : undefined);
+        const pctGrasaVal = pctGrasa !== undefined ? parseFloat(pctGrasa) : undefined;
+
         const vData = { 
             ...rest,
-            pesoActual: rest.pesoActual ?? (peso ? parseFloat(peso) : undefined),
+            pesoActual: pesoVal,
             deficitMusculo: rest.deficitMusculo ?? deficitMuscular,
             estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined),
-            // Mapeo de campos del nuevo formulario simplificado
-            ...(pctGrasa !== undefined && { pctGrasa2comp: parseFloat(pctGrasa) }),
+            // Mapeo y cálculo automático de compartimentos (2 Comp)
+            ...(pctGrasaVal !== undefined && { 
+                pctGrasa2comp: pctGrasaVal,
+                // Cálculo automático de kg de grasa si tenemos el peso
+                ...(pesoVal && { 
+                    kgGrasa2comp: (pesoVal * pctGrasaVal) / 100,
+                    kgMasaMagra2comp: pesoVal - ((pesoVal * pctGrasaVal) / 100)
+                })
+            }),
             ...(masaMagra !== undefined && { masaMagra: parseFloat(masaMagra) }),
         };
 
@@ -297,9 +307,22 @@ export const update = async (req, res, next) => {
             ...rest 
         } = req.body;
 
+        const pesoVal = rest.pesoActual ?? (peso ? parseFloat(peso) : undefined) ?? (talla ? undefined : undefined); // Trick to get pesoVal correctly
+        const pctGrasaVal = rest.pctGrasa2comp ?? (rest.pctGrasa ? parseFloat(rest.pctGrasa) : undefined);
+
         const vData = { ...rest };
         if (deficitMuscular) vData.deficitMusculo = deficitMuscular;
         if (talla) vData.estatura = talla;
+        if (pesoVal) vData.pesoActual = pesoVal;
+        
+        // Cálculo automático en el update
+        if (pctGrasaVal !== undefined) {
+            vData.pctGrasa2comp = pctGrasaVal;
+            if (vData.pesoActual) {
+                vData.kgGrasa2comp = (vData.pesoActual * pctGrasaVal) / 100;
+                vData.kgMasaMagra2comp = vData.pesoActual - vData.kgGrasa2comp;
+            }
+        }
 
         // Pliegues
         if (pliegues) {
