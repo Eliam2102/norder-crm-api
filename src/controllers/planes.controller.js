@@ -149,6 +149,7 @@ export const create = async (req, res, next) => {
                                     unidad: iData.unidad || 'GR',
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
+                                    platillo: iData.platillo || '',
                                     nota: iData.nota || '',
                                     orden: iIdx + 1
                                 }
@@ -275,6 +276,7 @@ export const update = async (req, res, next) => {
                                     unidad: iData.unidad || 'GR',
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
+                                    platillo: iData.platillo || '',
                                     nota: iData.nota || '',
                                     orden: iIdx + 1
                                 } 
@@ -321,6 +323,9 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 mesomorfico: true,
                 ectomorfico: true,
                 suplementacion: true,
+                comentarios: true,
+                evitar: true,
+                temarioConsulta: true,
                 barrido: {
                     select: {
                         kcalTotal: true
@@ -427,11 +432,27 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         plan.suplementacionReciente.push(...antecedentes.recomendacionSuplementos.split('\n').filter(s=>s.trim()));
     }
 
+    plan.temarioReciente = [];
+    if (ultimaVal?.temarioConsulta) {
+        plan.temarioReciente = ultimaVal.temarioConsulta.map(t => ({
+            tema: t.tema,
+            detalle: t.detalle
+        }));
+    }
+
+    plan.notasClinicasRecientes = ultimaVal?.comentarios || "";
+
+    plan.evitarReciente = [];
+    if (ultimaVal?.evitar) {
+        plan.evitarReciente = ultimaVal.evitar.split('\n').filter(e => e.trim());
+    } else if (antecedentes?.alimentosNoGustan) {
+        plan.evitarReciente = [antecedentes.alimentosNoGustan];
+    }
+
     plan.hidratacionReciente = antecedentes?.agua ? [antecedentes.agua] : [];
     
     plan.alimentosPersonales = [];
     if (antecedentes?.alimentosGustan) plan.alimentosPersonales.push("Preferencias: " + antecedentes.alimentosGustan);
-    if (antecedentes?.alimentosNoGustan) plan.alimentosPersonales.push("Evitar: " + antecedentes.alimentosNoGustan);
     if (antecedentes?.alergias) plan.alimentosPersonales.push("Alergias: " + antecedentes.alergias);
 
     if (!plan.pdfCustomMeta || typeof plan.pdfCustomMeta !== 'object') {
@@ -706,6 +727,7 @@ export const asignarPlan = async (req, res, next) => {
                                         unidad: i.unidad,
                                         eqCantidad: i.eqCantidad,
                                         eqGrupo: i.eqGrupo,
+                                        platillo: i.platillo,
                                         nota: i.nota,
                                         orden: i.orden
                                     }))
