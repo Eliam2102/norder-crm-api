@@ -308,7 +308,6 @@
             <% } %>
 
             <table>
-                <tr><td class="font-bold" style="width:80px;">Evitar:</td><td><%= meta.evitar || '-' %></td></tr>
                 <tr><td class="font-bold">Correo:</td><td><%= meta.correoConsulta || paciente.email || '-' %></td></tr>
             </table>
         </div>
@@ -653,12 +652,32 @@
         <% }); %>
     </table>
 
-    <div class="section-title">Lista de alimentos personales:</div>
+    <div class="section-title">Alimentos a evitar:</div>
     <table style="width: 450px;">
-        <% (plan.alimentosPersonales || meta.alimentosPersonales || ["-"]).forEach(ali => { %>
-            <tr><td><%= ali %></td></tr>
-        <% }); %>
+        <% if (plan.evitarReciente && plan.evitarReciente.length > 0) { %>
+            <% plan.evitarReciente.forEach(ev => { %>
+                <tr><td><%= ev %></td></tr>
+            <% }); %>
+        <% } else { %>
+            <tr><td>-</td></tr>
+        <% } %>
     </table>
+
+    <div class="section-title">Temario abordado:</div>
+    <table style="width: 450px;">
+        <% if (plan.temarioReciente && plan.temarioReciente.length > 0) { %>
+            <% plan.temarioReciente.forEach(tem => { %>
+                <tr><td><strong><%= tem.tema %>:</strong> <%= tem.detalle %></td></tr>
+            <% }); %>
+        <% } else { %>
+            <tr><td>-</td></tr>
+        <% } %>
+    </table>
+
+    <div class="section-title">Notas clínicas:</div>
+    <div style="font-size: 11px; color: #555; background: #f9f9f9; padding: 5px; border-radius: 4px; width: 450px;">
+        <%= plan.notasClinicasRecientes || '-' %>
+    </div>
 
     <% if (meta.estrategiaMaraton && meta.estrategiaMaraton.mostrar !== false) { %>
         <div class="section-title"><span class="highlight-yellow"><%= meta.estrategiaMaraton.titulo || 'Estrategia para 1/2 maraton' %></span></div>

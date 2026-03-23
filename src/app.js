@@ -19,6 +19,8 @@ import dashboardRoutes from './routes/dashboard.routes.js';
 import configuracionRoutes from './routes/configuracion.routes.js';
 import barridoRoutes from './routes/barrido.routes.js';
 import alimentosSMAERoutes from './routes/alimentosSmae.routes.js';
+import platillosRoutes from './routes/platillos.routes.js';
+import citasRoutes from './routes/citas.routes.js';
 
 const app = express();
 
@@ -53,6 +55,8 @@ app.use('/api/pacientes', authMiddleware, requirePermiso('pacientes', 'read'), p
 app.use('/api/planes', authMiddleware, requirePermiso('planes', 'read'), planRoutes);
 app.use('/api/dashboard', authMiddleware, requirePermiso('dashboard', 'read'), dashboardRoutes);
 app.use('/api/alimentos-smae', authMiddleware, requirePermiso('smae', 'read'), alimentosSMAERoutes);
+app.use('/api/platillos', authMiddleware, platillosRoutes);
+app.use('/api/citas', authMiddleware, citasRoutes);
 
 // Opcionales o específicos
 app.use('/api/configuracion', authMiddleware, configuracionRoutes);

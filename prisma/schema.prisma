@@ -33,6 +33,7 @@ model Paciente {
   temarioConsultas TemarioConsulta[]
   requerimientos   Requerimiento[]
   barridos         BarridoEquivalencias[]
+  citas            Cita[]
 
   @@map("paciente")
 }
@@ -205,6 +206,7 @@ model Valoracion {
   // Notas
   comentarios             String?
   suplementacion          String?  @map("suplementacion")
+  evitar                  String?  @map("evitar")
   createdAt               DateTime @default(now()) @map("created_at")
 
   paciente        Paciente              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -345,6 +347,7 @@ model PlanIngrediente {
   eqGrupo        String?  @map("eq_grupo")
   nota           String?
   orden          Int      @default(1)
+  platillo       String?
 
   tiempoComida PlanTiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
 
@@ -511,4 +514,29 @@ model User {
   actualizadoEn DateTime @updatedAt @map("actualizado_en")
 
   @@map("user")
+}
+
+model Platillo {
+  id           String   @id @default(uuid())
+  nombre       String
+  categoria    String   @default("Desayuno")
+  ingredientes Json
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("platillo")
+}
+
+model Cita {
+  id                String   @id @default(uuid())
+  pacienteId        String   @map("paciente_id")
+  fecha             DateTime
+  modalidad         String
+  calcomBookingId   String?  @map("calcom_booking_id")
+  calcomEventTypeId Int?     @map("calcom_event_type_id")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("cita")
 }
