@@ -55,7 +55,8 @@ export const generarPlanPDF = async (plan, valoraciones = []) => {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: 'networkidle0' });
 
-    const filePath = path.join("/tmp", `plan-${id}.pdf`);
+    const uniqueId = Math.random().toString(36).substring(7);
+    const filePath = path.join("/tmp", `plan-${id}-${uniqueId}.pdf`);
     await page.pdf({ path: filePath, format: "A4", landscape: true });
 
     await browser.close();

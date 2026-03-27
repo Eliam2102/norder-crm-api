@@ -159,6 +159,14 @@
         .menu-item { margin-bottom: 3px; padding-left: 8px; position: relative; font-size: 8.5px; }
         .menu-item:before { content: "-"; position: absolute; left: 0; }
         .menu-water { margin-top: 8px; font-size: 9px; }
+        .menu-bebida { margin-top: 4px; font-size: 9px; color: #3a9eff; }
+        .menu-supl { margin-top: 3px; font-size: 9px; color: #a97fff; }
+        .supl-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px; }
+        .supl-table th, .supl-table td { border: 1px solid #000; padding: 4px 8px; text-align: left; }
+        .supl-table th { background: #f0f0f0; font-weight: 700; }
+        .supl-activo { color: #22863a; font-weight: bold; }
+        .supl-suspendido { color: #999; font-weight: bold; }
+        .supl-row-suspended { opacity: 0.55; text-decoration: line-through; }
     </style>
 </head>
 <body>
@@ -384,6 +392,12 @@
                 <% if(tMenu1 && tMenu1.notaPie) { %>
                     <div class="menu-water"><%= tMenu1.notaPie %></div>
                 <% } %>
+                <% if(tMenu1 && tMenu1.bebida) { %>
+                    <div class="menu-bebida">💧 <%= tMenu1.bebida %></div>
+                <% } %>
+                <% if(tMenu1 && tMenu1.suplTiempo) { %>
+                    <div class="menu-supl">💊 <%= tMenu1.suplTiempo %><% if(tMenu1.suplNotas) { %> — <span style="font-size:8px;"><%= tMenu1.suplNotas %></span><% } %></div>
+                <% } %>
             </div>
             
             <!-- Menú 2 -->
@@ -426,6 +440,12 @@
 
                 <% if(tMenu2 && tMenu2.notaPie) { %>
                     <div class="menu-water"><%= tMenu2.notaPie %></div>
+                <% } %>
+                <% if(tMenu2 && tMenu2.bebida) { %>
+                    <div class="menu-bebida">💧 <%= tMenu2.bebida %></div>
+                <% } %>
+                <% if(tMenu2 && tMenu2.suplTiempo) { %>
+                    <div class="menu-supl">💊 <%= tMenu2.suplTiempo %><% if(tMenu2.suplNotas) { %> — <span style="font-size:8px;"><%= tMenu2.suplNotas %></span><% } %></div>
                 <% } %>
             </div>
         </div>
@@ -639,11 +659,34 @@
     <%- headerHTML %>
     
     <div class="section-title">Esquema de suplementación:</div>
-    <table style="width: 250px;">
-        <% (plan.suplementacionReciente || meta.suplementacion || ["-", "-"]).forEach(sup => { %>
-            <tr><td><%= sup %></td></tr>
-        <% }); %>
-    </table>
+    <% if (plan.suplementosTabla && plan.suplementosTabla.length > 0) { %>
+        <table class="supl-table">
+            <thead>
+                <tr>
+                    <th>Suplemento</th>
+                    <th>Indicaciones</th>
+                    <th>Estado</th>
+                    <th>Tiempo de uso</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% plan.suplementosTabla.forEach(sup => { %>
+                    <tr class="<%= sup.activo ? '' : 'supl-row-suspended' %>">
+                        <td><%= sup.nombre %></td>
+                        <td><%= sup.indicaciones %></td>
+                        <td><span class="<%= sup.activo ? 'supl-activo' : 'supl-suspendido' %>"><%= sup.estado %></span></td>
+                        <td><%= sup.duracion || '-' %></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <table style="width: 250px;">
+            <% (plan.suplementacionReciente || meta.suplementacion || ["-", "-"]).forEach(sup => { %>
+                <tr><td><%= sup %></td></tr>
+            <% }); %>
+        </table>
+    <% } %>
 
     <div class="section-title">Esquema de hidratación:</div>
     <table style="width: 250px;">
