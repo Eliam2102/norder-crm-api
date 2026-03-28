@@ -588,6 +588,8 @@ export const generatePdf = async (req, res, next) => {
 
         const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow);
 
+        console.log("[generatePdf] Plan ID:", planRow.id, "| proximaSesion:", planRow.proximaSesion);
+
         const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
         
         const fileNamePart = planEnriquecido.paciente 
