@@ -159,6 +159,14 @@
         .menu-item { margin-bottom: 3px; padding-left: 8px; position: relative; font-size: 8.5px; }
         .menu-item:before { content: "-"; position: absolute; left: 0; }
         .menu-water { margin-top: 8px; font-size: 9px; }
+        .menu-bebida { margin-top: 4px; font-size: 9px; color: #000; }
+        .menu-supl { margin-top: 3px; font-size: 9px; color: #000; }
+        .supl-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px; }
+        .supl-table th, .supl-table td { border: 1px solid #000; padding: 4px 8px; text-align: left; }
+        .supl-table th { background: #f0f0f0; font-weight: 700; }
+        .supl-activo { color: #22863a; font-weight: bold; }
+        .supl-suspendido { color: #999; font-weight: bold; }
+        .supl-row-suspended { opacity: 0.55; text-decoration: line-through; }
     </style>
 </head>
 <body>
@@ -362,27 +370,37 @@
                         if (plat && !meta.soloEquivalencias) { %>
                             <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
                         <% }
-                        grouped1[plat].forEach(ing => { %>
+                        grouped1[plat].forEach(ing => {
+                        %>
                         <div class="menu-item">
                             <% if (meta.soloEquivalencias) { %>
                                 <% if(ing.eqCantidad && ing.eqGrupo) { %>
                                     • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
                                 <% } %>
                             <% } else { %>
-                                <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
+                                <% const cantNum1 = parseFloat(ing.cantidad) || 0; %>
+                                <% if (cantNum1 > 0) { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
+                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
+                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
+                                    <% } %>
+                                <% } else if (ing.descripcion) { %>
+                                    <%= ing.descripcion %>
                                 <% } %>
                             <% } %>
                         </div>
                     <%  });
                     }); %>
-                <% } else { %>
-                    <div class="menu-item text-center" style="color:#aaa; font-style:italic; margin-top:20px;">Sin platillo</div>
                 <% } %>
                 
                 <% if(tMenu1 && tMenu1.notaPie) { %>
                     <div class="menu-water"><%= tMenu1.notaPie %></div>
+                <% } %>
+                <% if(tMenu1 && tMenu1.bebida) { %>
+                    <div class="menu-bebida"><%= tMenu1.bebida %></div>
+                <% } %>
+                <% if(tMenu1 && tMenu1.suplTiempo) { %>
+                    <div class="menu-supl"><%= tMenu1.suplTiempo %><% if(tMenu1.suplNotas) { %> — <span style="font-size:8px;"><%= tMenu1.suplNotas %></span><% } %></div>
                 <% } %>
             </div>
             
@@ -405,27 +423,37 @@
                         if (plat && !meta.soloEquivalencias) { %>
                             <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
                         <% }
-                        grouped2[plat].forEach(ing => { %>
+                        grouped2[plat].forEach(ing => {
+                        %>
                         <div class="menu-item">
                             <% if (meta.soloEquivalencias) { %>
                                 <% if(ing.eqCantidad && ing.eqGrupo) { %>
                                     • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
                                 <% } %>
                             <% } else { %>
-                                <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
+                                <% const cantNum2 = parseFloat(ing.cantidad) || 0; %>
+                                <% if (cantNum2 > 0) { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
+                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
+                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
+                                    <% } %>
+                                <% } else if (ing.descripcion) { %>
+                                    <%= ing.descripcion %>
                                 <% } %>
                             <% } %>
                         </div>
                     <%  });
                     }); %>
-                <% } else { %>
-                    <div class="menu-item text-center" style="color:#aaa; font-style:italic; margin-top:20px;">Sin platillo</div>
                 <% } %>
 
                 <% if(tMenu2 && tMenu2.notaPie) { %>
                     <div class="menu-water"><%= tMenu2.notaPie %></div>
+                <% } %>
+                <% if(tMenu2 && tMenu2.bebida) { %>
+                    <div class="menu-bebida"><%= tMenu2.bebida %></div>
+                <% } %>
+                <% if(tMenu2 && tMenu2.suplTiempo) { %>
+                    <div class="menu-supl"><%= tMenu2.suplTiempo %><% if(tMenu2.suplNotas) { %> — <span style="font-size:8px;"><%= tMenu2.suplNotas %></span><% } %></div>
                 <% } %>
             </div>
         </div>
@@ -433,7 +461,7 @@
 
         <div class="menu-row" style="min-height:20px; text-align:right;">
             <div style="padding: 5px 15px; width:100%; font-size:11px;">
-                <i>Próxima sesión:</i> &nbsp;&nbsp;&nbsp;&nbsp;<strong><%= plan.proximaSesion ? new Date(plan.proximaSesion).toLocaleString("es-MX", {day:"2-digit", month:"long", year:"numeric", hour:"2-digit", minute:"2-digit", hour12:true}).replace(',', ' a las') : (meta.proximaSesionTexto || 'Pendiente') %></strong>
+                <i>Próxima sesión:</i> &nbsp;&nbsp;&nbsp;&nbsp;<strong><%= plan.proximaSesion ? (() => { const _d = new Date(plan.proximaSesion); const _meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const _dd = String(_d.getDate()).padStart(2,'0'); const _mm = _meses[_d.getMonth()]; const _yy = _d.getFullYear(); let _hh = _d.getHours(); const _min = String(_d.getMinutes()).padStart(2,'0'); const _ampm = _hh >= 12 ? 'p.m.' : 'a.m.'; _hh = _hh % 12 || 12; return `${_dd} de ${_mm} de ${_yy} a las ${_hh}:${_min} ${_ampm}`; })() : (meta.proximaSesionTexto || 'Pendiente') %></strong>
             </div>
         </div>
     </div>
@@ -639,11 +667,34 @@
     <%- headerHTML %>
     
     <div class="section-title">Esquema de suplementación:</div>
-    <table style="width: 250px;">
-        <% (plan.suplementacionReciente || meta.suplementacion || ["-", "-"]).forEach(sup => { %>
-            <tr><td><%= sup %></td></tr>
-        <% }); %>
-    </table>
+    <% if (plan.suplementosTabla && plan.suplementosTabla.length > 0) { %>
+        <table class="supl-table">
+            <thead>
+                <tr>
+                    <th>Suplemento</th>
+                    <th>Indicaciones</th>
+                    <th>Estado</th>
+                    <th>Tiempo de uso</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% plan.suplementosTabla.forEach(sup => { %>
+                    <tr class="<%= sup.activo ? '' : 'supl-row-suspended' %>">
+                        <td><%= sup.nombre %></td>
+                        <td><%= sup.indicaciones %></td>
+                        <td><span class="<%= sup.activo ? 'supl-activo' : 'supl-suspendido' %>"><%= sup.estado %></span></td>
+                        <td><%= sup.duracion || '-' %></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    <% } else { %>
+        <table style="width: 250px;">
+            <% (plan.suplementacionReciente || meta.suplementacion || ["-", "-"]).forEach(sup => { %>
+                <tr><td><%= sup %></td></tr>
+            <% }); %>
+        </table>
+    <% } %>
 
     <div class="section-title">Esquema de hidratación:</div>
     <table style="width: 250px;">

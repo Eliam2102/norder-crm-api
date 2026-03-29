@@ -206,6 +206,7 @@ model Valoracion {
   // Notas
   comentarios             String?
   suplementacion          String?  @map("suplementacion")
+  suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
   createdAt               DateTime @default(now()) @map("created_at")
 
@@ -296,6 +297,7 @@ model Plan {
 
   proximaSesion  DateTime? @map("proxima_sesion")
   notasGenerales String?   @map("notas_generales")
+  suplementosDetalle Json?
   estado         String    @default("activo")
   estadoEnvio    String    @default("pendiente") @map("estado_envio")
   pdfUrl         String?   @map("pdf_url")
@@ -328,8 +330,11 @@ model PlanTiempoComida {
   menuId    String   @map("menu_id")
   nombre    String
   orden     Int      @default(1)
-  notaPie   String?  @map("nota_pie")
-  createdAt DateTime @default(now()) @map("created_at")
+  notaPie    String?  @map("nota_pie")
+  bebida     String?
+  suplTiempo String?  @map("supl_tiempo")
+  suplNotas  String?  @map("supl_notas")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   menu         PlanMenu          @relation(fields: [menuId], references: [id], onDelete: Cascade)
   ingredientes PlanIngrediente[]
@@ -346,6 +351,8 @@ model PlanIngrediente {
   eqCantidad     Decimal? @map("eq_cantidad") @db.Decimal(5, 1)
   eqGrupo        String?  @map("eq_grupo")
   nota           String?
+  equivalencias  Json?
+  smaeGrPorEq    Float?   @map("smae_gr_por_eq")
   orden          Int      @default(1)
   platillo       String?
 

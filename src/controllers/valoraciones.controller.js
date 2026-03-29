@@ -93,6 +93,7 @@ export const create = async (req, res, next) => {
             // Nuevo payload simplificado del frontend
             pctGrasa,       // frontend lo manda así → guardar como pctGrasa2comp
             masaMagra,      // campo a guardar directamente en el modelo
+            suplementosDetalle,
             ...rest 
         } = req.body;
 
@@ -101,6 +102,7 @@ export const create = async (req, res, next) => {
 
         const vData = { 
             ...rest,
+            suplementosDetalle: suplementosDetalle || [],
             pesoActual: pesoVal,
             deficitMusculo: rest.deficitMusculo ?? deficitMuscular,
             estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined),
@@ -304,13 +306,15 @@ export const update = async (req, res, next) => {
             // Aliases
             deficitMuscular, talla,
             createdAt, updatedAt,
+            suplementosDetalle,
             ...rest 
         } = req.body;
 
-        const pesoVal = rest.pesoActual ?? (peso ? parseFloat(peso) : undefined) ?? (talla ? undefined : undefined); // Trick to get pesoVal correctly
+        const pesoVal = rest.pesoActual ?? (rest.peso ? parseFloat(rest.peso) : undefined);
         const pctGrasaVal = rest.pctGrasa2comp ?? (rest.pctGrasa ? parseFloat(rest.pctGrasa) : undefined);
 
         const vData = { ...rest };
+        if (suplementosDetalle !== undefined) vData.suplementosDetalle = suplementosDetalle || [];
         if (deficitMuscular) vData.deficitMusculo = deficitMuscular;
         if (talla) vData.estatura = talla;
         if (pesoVal) vData.pesoActual = pesoVal;
@@ -349,6 +353,7 @@ export const update = async (req, res, next) => {
             vData.perimetroPantorrilla = perimetros.pantorrilla;
             vData.brazoCorregido = perimetros.brazoCor;
             vData.piernaCorregida = perimetros.piernaCor;
+            vData.pantorrillaCorregida = perimetros.pantoCor;
         }
 
         // Bio & Bioq

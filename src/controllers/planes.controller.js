@@ -72,6 +72,7 @@ export const create = async (req, res, next) => {
             notasGenerales,
             notas,
             valoracionId,
+            suplementosDetalle,
             ...extra
         } = req.body;
         
@@ -94,6 +95,21 @@ export const create = async (req, res, next) => {
             if (isNaN(proximaDateTime.getTime())) proximaDateTime = null;
         }
 
+        // Obtener peso del paciente para calcular gr/kg
+        let pesoKg = 0;
+        if (pacienteId) {
+            const ultimaVal = await prisma.valoracion.findFirst({
+                where: { pacienteId },
+                orderBy: { fecha: 'desc' },
+                select: { pesoActual: true }
+            });
+            pesoKg = ultimaVal?.pesoActual ? Number(ultimaVal.pesoActual) : 0;
+        }
+
+        const pGr = (kcal * pP / 100) / 4;
+        const cGr = (kcal * cP / 100) / 4;
+        const gGr = (kcal * gP / 100) / 9;
+
         const nuevoPlan = await prisma.plan.create({
             data: {
                 nombre: nombre || nombrePlan || 'Plan Sin Título',
@@ -105,13 +121,17 @@ export const create = async (req, res, next) => {
                 proteinasKcal: Math.round(kcal * pP / 100),
                 carbohidratosKcal: Math.round(kcal * cP / 100),
                 grasasKcal: Math.round(kcal * gP / 100),
-                proteinasGr: (kcal * pP / 100) / 4,
-                carbohidratosGr: (kcal * cP / 100) / 4,
-                grasasGr: (kcal * gP / 100) / 9,
+                proteinasGr: pGr,
+                carbohidratosGr: cGr,
+                grasasGr: gGr,
+                proteinasGrKg: pesoKg > 0 ? pGr / pesoKg : null,
+                carbohidratosGrKg: pesoKg > 0 ? cGr / pesoKg : null,
+                grasasGrKg: pesoKg > 0 ? gGr / pesoKg : null,
                 pacienteId: pacienteId || null,
                 valoracionId: valoracionId || null,
                 proximaSesion: proximaDateTime,
                 notasGenerales: notasGenerales || notas || '',
+                suplementosDetalle: suplementosDetalle || [],
                 estado: 'activo',
                 estadoEnvio: 'pendiente'
             }
@@ -135,7 +155,10 @@ export const create = async (req, res, next) => {
                             menuId: menu.id,
                             nombre: tData.nombre || 'Comida',
                             orden: tIdx + 1,
-                            notaPie: tData.nota || tData.notaPie || ''
+                            notaPie: tData.nota || tData.notaPie || '',
+                            bebida: tData.bebida || null,
+                            suplTiempo: tData.suplTiempo || null,
+                            suplNotas: tData.suplNotas || null
                         }
                     });
 
@@ -151,6 +174,8 @@ export const create = async (req, res, next) => {
                                     eqGrupo: iData.eqGrupo || '',
                                     platillo: iData.platillo || '',
                                     nota: iData.nota || '',
+                                    equivalencias: iData.equivalencias || null,
+                                    smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
                                     orden: iIdx + 1
                                 }
                             });
@@ -210,6 +235,7 @@ export const update = async (req, res, next) => {
             proximaSesionHora,
             notasGenerales,
             notas,
+            suplementosDetalle,
             ...extra
         } = req.body;
 
@@ -221,25 +247,44 @@ export const update = async (req, res, next) => {
         const dataUpdate = {
             nombre: nombre || nombrePlan,
             tipoPlan: tipoPlan || tipo,
-            notasGenerales: notasGenerales || notas
+            notasGenerales: notasGenerales || notas,
+            suplementosDetalle: suplementosDetalle || []
         };
+
+        // Obtener peso del paciente para calcular gr/kg
+        const existingPlan = await prisma.plan.findUnique({ where: { id }, select: { pacienteId: true } });
+        let pesoKg = 0;
+        if (existingPlan?.pacienteId) {
+            const ultimaVal = await prisma.valoracion.findFirst({
+                where: { pacienteId: existingPlan.pacienteId },
+                orderBy: { fecha: 'desc' },
+                select: { pesoActual: true }
+            });
+            pesoKg = ultimaVal?.pesoActual ? Number(ultimaVal.pesoActual) : 0;
+        }
 
         if (!isNaN(kcal)) {
             dataUpdate.calorias = Math.round(kcal);
             if (!isNaN(pP)) {
+                const pGr = (kcal * pP / 100) / 4;
                 dataUpdate.proteinasPct = pP;
                 dataUpdate.proteinasKcal = Math.round(kcal * pP / 100);
-                dataUpdate.proteinasGr = (kcal * pP / 100) / 4;
+                dataUpdate.proteinasGr = pGr;
+                dataUpdate.proteinasGrKg = pesoKg > 0 ? pGr / pesoKg : null;
             }
             if (!isNaN(cP)) {
+                const cGr = (kcal * cP / 100) / 4;
                 dataUpdate.carbohidratosPct = cP;
                 dataUpdate.carbohidratosKcal = Math.round(kcal * cP / 100);
-                dataUpdate.carbohidratosGr = (kcal * cP / 100) / 4;
+                dataUpdate.carbohidratosGr = cGr;
+                dataUpdate.carbohidratosGrKg = pesoKg > 0 ? cGr / pesoKg : null;
             }
             if (!isNaN(gP)) {
+                const gGr = (kcal * gP / 100) / 9;
                 dataUpdate.grasasPct = gP;
                 dataUpdate.grasasKcal = Math.round(kcal * gP / 100);
-                dataUpdate.grasasGr = (kcal * gP / 100) / 9;
+                dataUpdate.grasasGr = gGr;
+                dataUpdate.grasasGrKg = pesoKg > 0 ? gGr / pesoKg : null;
             }
         }
         
@@ -264,7 +309,7 @@ export const update = async (req, res, next) => {
                 const tiempos = mData.tiempos || mData.tiemposComida || [];
                 for (const [tIdx, tData] of tiempos.entries()) {
                     const tiempo = await prisma.planTiempoComida.create({
-                        data: { menuId: menu.id, nombre: tData.nombre, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie }
+                        data: { menuId: menu.id, nombre: tData.nombre, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie, bebida: tData.bebida || null, suplTiempo: tData.suplTiempo || null, suplNotas: tData.suplNotas || null }
                     });
                     if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
                         for (const [iIdx, iData] of tData.ingredientes.entries()) {
@@ -278,6 +323,8 @@ export const update = async (req, res, next) => {
                                     eqGrupo: iData.eqGrupo || '',
                                     platillo: iData.platillo || '',
                                     nota: iData.nota || '',
+                                    equivalencias: iData.equivalencias || null,
+                                    smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
                                     orden: iIdx + 1
                                 } 
                             });
@@ -301,8 +348,28 @@ export const update = async (req, res, next) => {
 const enrichPlanForPdf = async (plan, metaOverride = null) => {
     let valoraciones = [];
     if (plan.pacienteId) {
+        
+        // 1. Determinar la "máquina del tiempo": límite de fecha para el historial
+        let dateLimit = new Date();
+        if (plan.valoracionId) {
+            const valTarget = await prisma.valoracion.findUnique({
+                where: { id: plan.valoracionId },
+                select: { fecha: true }
+            });
+            if (valTarget && valTarget.fecha) {
+                dateLimit = valTarget.fecha;
+            } else {
+                dateLimit = plan.fechaCreacion || new Date();
+            }
+        } else {
+            dateLimit = plan.fechaCreacion || new Date();
+        }
+
         let rawValoraciones = await prisma.valoracion.findMany({
-            where: { pacienteId: plan.pacienteId },
+            where: { 
+                pacienteId: plan.pacienteId,
+                fecha: { lte: dateLimit } // Solo valoraciones hasta esa fecha
+            },
             orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
             take: 20, // Tomamos más para garantizar 7 únicas después de de-duplicar
             select: { 
@@ -344,7 +411,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             }
         });
         
-        // Ya no de-duplicamos por fecha. Solo mostramos las últimas 7.
+        // Reloj histórico: Solo mostramos las últimas 7.
         valoraciones = rawValoraciones.slice(0, 7);
         
         const historicoPlanes = await prisma.plan.findMany({
@@ -426,7 +493,42 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
     plan.lineamientosRecientes = plan.notasGenerales ? plan.notasGenerales.split('\n').filter(n=>n.trim()) : [];
     
     plan.suplementacionReciente = [];
-    if (ultimaVal?.suplementacion) {
+    plan.suplementosTabla = []; // Tabla completa para PDF (activos + suspendidos)
+    if (plan.suplementosDetalle && Array.isArray(plan.suplementosDetalle)) {
+        // Tabla completa con estado y duración
+        plan.suplementosTabla = plan.suplementosDetalle.map(s => {
+            let duracionStr = '';
+            if (s.fechaInicio) {
+                const start = new Date(s.fechaInicio);
+                const end = s.activo ? new Date() : (s.fechaFin ? new Date(s.fechaFin) : new Date());
+                if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                    const diffTime = Math.max(0, end - start);
+                    const diffDays = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+                    const meses = Math.floor(diffDays / 30);
+                    const extra = diffDays % 30;
+                    if (meses > 0) {
+                        duracionStr = `${meses} mes${meses > 1 ? 'es' : ''}${extra > 0 ? ' y ' + extra + ' d' : ''}`;
+                    } else {
+                        duracionStr = `${diffDays} día${diffDays > 1 ? 's' : ''}`;
+                    }
+                }
+            }
+            return {
+                nombre: s.nombre,
+                indicaciones: s.indicaciones,
+                activo: s.activo,
+                estado: s.activo ? 'ACTIVO' : 'SUSPENDIDO',
+                duracion: duracionStr
+            };
+        });
+
+        // Lista legacy para texto plano (solo activos)
+        const activos = plan.suplementosDetalle.filter(s => s.activo);
+        plan.suplementacionReciente = activos.map(s => {
+            const entry = plan.suplementosTabla.find(t => t.nombre === s.nombre);
+            return `${s.nombre}: ${s.indicaciones}${entry ? ' (' + entry.duracion + ')' : ''}`;
+        });
+    } else if (ultimaVal?.suplementacion) {
         plan.suplementacionReciente.push(...ultimaVal.suplementacion.split('\n').filter(s=>s.trim()));
     } else if (antecedentes?.recomendacionSuplementos) {
         plan.suplementacionReciente.push(...antecedentes.recomendacionSuplementos.split('\n').filter(s=>s.trim()));
@@ -485,6 +587,8 @@ export const generatePdf = async (req, res, next) => {
         });
 
         const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow);
+
+        console.log("[generatePdf] Plan ID:", planRow.id, "| proximaSesion:", planRow.proximaSesion);
 
         const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
         
@@ -590,13 +694,20 @@ export const sendPlan = async (req, res, next) => {
         const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow);
 
         // 4. Generar PDF con tabla de progreso enriquecida
-        const pdfBuffer = await pdfService.generarPlanPDFBuffer(planEnriquecido, paciente, valoraciones);
+        let pdfBuffer;
+        try {
+            pdfBuffer = await pdfService.generarPlanPDFBuffer(planEnriquecido, paciente, valoraciones);
+        } catch (pdfErr) {
+            console.error('[sendPlan] Error crítico generando PDF con Puppeteer:', pdfErr);
+            return error(res, 'Error interno al generar el PDF del plan. No se pudo enviar.', 500);
+        }
 
         // 5. Enviar correo y WhatsApp mediante N8N Webhook
         const nombreArchivo = `plan-${(planEnriquecido.nombre || 'alimenticio').replace(/ /g, '_')}.pdf`;
         const webhookUrl = process.env.N8N_WEBHOOK_URL;
         
         let statusMensajes = 'no-definido';
+        let n8nResponseText = '';
         
         if (webhookUrl) {
             try {
@@ -604,31 +715,59 @@ export const sendPlan = async (req, res, next) => {
                 formData.append('pdfPlan', new Blob([pdfBuffer], { type: 'application/pdf' }), nombreArchivo);
                 formData.append('email', paciente.email || '');
 
-                // Sanitizar teléfono: solo dígitos, sin +, espacios ni guiones
-                // Si no tiene lada (menos de 11 dígitos para MX), agregar 52 por default
                 let telefonoLimpio = (paciente.telefono || '').replace(/\D/g, '');
                 if (telefonoLimpio && telefonoLimpio.length <= 10) {
-                    telefonoLimpio = '52' + telefonoLimpio; // agregar lada MX si falta
+                    telefonoLimpio = '52' + telefonoLimpio; 
                 }
                 formData.append('telefono', telefonoLimpio);
 
                 formData.append('paciente_nombre', paciente.nombre || '');
                 formData.append('plan_nombre', planEnriquecido.nombre || '');
+                
+                console.log(`[sendPlan] Preparando envío a N8N: ${webhookUrl}`);
+                console.log(`[sendPlan] Tamaño del PDF: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
-                const response = await fetch(webhookUrl, {
-                    method: 'POST',
-                    body: formData,
+                const fileObj = new File([pdfBuffer], nombreArchivo, { type: 'application/pdf' });
+                formData.set('pdfPlan', fileObj);
+
+                // Axios post
+                const { default: axios } = await import('axios');
+                const response = await axios.post(webhookUrl, formData, {
+                    headers: {
+                        // Axios handles multipart headers automatically when given FormData
+                    },
+                    maxBodyLength: Infinity,
+                    maxContentLength: Infinity
                 });
 
-                if (!response.ok) throw new Error(`Error N8N: ${response.statusText || response.status}`);
                 statusMensajes = 'ok';
                 console.log('[sendPlan] PDF y Meta-datos emitidos a N8N Webhook con éxito.');
+                
+                // Intento parsear la respuesta por si N8N nos da un reporte de Email/WhatsApp individual
+                try {
+                    const jsonRes = response.data;
+                    console.log('[sendPlan] Respuesta N8N detallada:', jsonRes);
+                    if (jsonRes && (jsonRes.email === 'error' || jsonRes.whatsapp === 'error')) {
+                        statusMensajes = 'advertencia';
+                    }
+                } catch(e) {}
+
             } catch (err) {
-                console.error(`[sendPlan] Error emitiendo PDF a N8N:`, err.message);
+                // Determine if it was an HTTP error or network error
+                let errorMsg = err.message;
+                if (err.response) {
+                    errorMsg = `Status ${err.response.status}: ${JSON.stringify(err.response.data).substring(0, 150)}`;
+                } else if (err.request) {
+                    errorMsg = `Sin respuesta del servidor (${err.code})`;
+                }
+                
+                console.error(`[sendPlan] Falló ejecución hacia N8N:`, errorMsg);
                 statusMensajes = 'error';
+                return error(res, `Fallo al comunicarse con el orquestador (N8N): ${errorMsg}`, 502);
             }
         } else {
             console.warn('[sendPlan] Falló el envío porque N8N_WEBHOOK_URL no está definido en .env');
+            return error(res, 'El sistema no tiene configurada la URL del orquestador (N8N).', 500);
         }
 
         // 6. Marcar como enviado
@@ -719,6 +858,9 @@ export const asignarPlan = async (req, res, next) => {
                             create: menu.tiemposComida.map(t => ({
                                 nombre: t.nombre,
                                 notaPie: t.notaPie,
+                                bebida: t.bebida,
+                                suplTiempo: t.suplTiempo,
+                                suplNotas: t.suplNotas,
                                 orden: t.orden,
                                 ingredientes: {
                                     create: t.ingredientes.map(i => ({
@@ -729,6 +871,8 @@ export const asignarPlan = async (req, res, next) => {
                                         eqGrupo: i.eqGrupo,
                                         platillo: i.platillo,
                                         nota: i.nota,
+                                        equivalencias: i.equivalencias,
+                                        smaeGrPorEq: i.smaeGrPorEq,
                                         orden: i.orden
                                     }))
                                 }
