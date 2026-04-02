@@ -21,16 +21,32 @@ import barridoRoutes from './routes/barrido.routes.js';
 import alimentosSMAERoutes from './routes/alimentosSmae.routes.js';
 import platillosRoutes from './routes/platillos.routes.js';
 import citasRoutes from './routes/citas.routes.js';
+import agentRoutes from './routes/agent.routes.js';
 
 const app = express();
 
 // Security Middlewares
 app.use(helmet());
 app.use(cors({
-    origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173'],
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true); // Permite herramientas locales y Postman
+        const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
+        if (process.env.FRONTEND_URL) {
+            allowedOrigins.push(...process.env.FRONTEND_URL.split(','));
+        }
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        } else {
+            // Permitir localhost dinámico para evitar fricción en desarrollo
+            if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+                return callback(null, true);
+            }
+            return callback(new Error('No permitido por CORS (Origin no registrado)'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
 }));
 
 // Regular body parsers
@@ -57,6 +73,9 @@ app.use('/api/dashboard', authMiddleware, requirePermiso('dashboard', 'read'), d
 app.use('/api/alimentos-smae', authMiddleware, requirePermiso('smae', 'read'), alimentosSMAERoutes);
 app.use('/api/platillos', authMiddleware, platillosRoutes);
 app.use('/api/citas', authMiddleware, citasRoutes);
+
+// Agente nutriólogo — sin JWT (protegido por X-Agent-Key opcional)
+app.use('/api/agent', agentRoutes);
 
 // Opcionales o específicos
 app.use('/api/configuracion', authMiddleware, configuracionRoutes);

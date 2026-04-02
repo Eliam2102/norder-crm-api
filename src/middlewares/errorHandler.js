@@ -5,7 +5,8 @@ const errorHandler = (err, req, res, next) => {
 
     // Prisma Errors
     if (err.code === 'P2002') {
-        return error(res, 'Un registro con este campo único ya existe (Conflicto)', 409);
+        const target = err.meta?.target ? ` (${err.meta.target})` : '';
+        return error(res, `Un registro con este campo único ya existe (Conflicto)${target}`, 409);
     }
     if (err.code === 'P2025') {
         return error(res, 'Registro no encontrado', 404);

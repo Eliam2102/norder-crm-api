@@ -204,7 +204,14 @@ export const getById = async (req, res, next) => {
         const valoracion = await prisma.valoracion.findUniqueOrThrow({
             where: { id: req.params.id },
             include: {
-                paciente: true,
+                paciente: {
+                    include: {
+                        citas: {
+                            where: { valoracionId: req.params.id },
+                            orderBy: { fecha: 'asc' }
+                        }
+                    }
+                },
                 temarioConsulta: true,
                 revisiones: true,
                 planes: { 
