@@ -110,9 +110,19 @@ export const create = async (req, res, next) => {
         const cGr = (kcal * cP / 100) / 4;
         const gGr = (kcal * gP / 100) / 9;
 
+        // Obtener paciente para el nombre por defecto
+        let pacienteNombre = '';
+        if (pacienteId) {
+            const pac = await prisma.paciente.findUnique({ where: { id: pacienteId }, select: { nombre: true, apellido: true } });
+            if (pac) pacienteNombre = `${pac.nombre} ${pac.apellido || ''}`.trim();
+        }
+
+        const today = new Date();
+        const defaultName = `Plan, ${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}${pacienteNombre ? `, ${pacienteNombre}` : ''}`;
+
         const nuevoPlan = await prisma.plan.create({
             data: {
-                nombre: nombre || nombrePlan || 'Plan Sin Título',
+                nombre: nombre || nombrePlan || defaultName,
                 tipoPlan: tipoPlan || tipo || 'Balanceada',
                 calorias: Math.round(kcal),
                 proteinasPct: pP,
@@ -600,19 +610,34 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             select: { calorias: true, valoracionId: true, fechaCreacion: true }
         });
 
-        // --- FIX: Buscar próxima cita agendada en la tabla Cita ---
-        const nextCita = await prisma.cita.findFirst({
-            where: {
-                pacienteId: plan.pacienteId,
-                fecha: { gte: new Date() }
-            },
-            orderBy: { fecha: 'asc' },
-            select: { fecha: true }
-        });
+        // --- FIX: Buscar próxima cita vinculada a la valoración del plan ---
+        // Prioridad 1: cita asociada al valoracionId específico del plan
+        let nextCita = null;
+        if (plan.valoracionId) {
+            nextCita = await prisma.cita.findFirst({
+                where: {
+                    valoracionId: plan.valoracionId,
+                },
+                orderBy: { fecha: 'asc' },
+                select: { fecha: true }
+            });
+        }
+        // Prioridad 2: fallback → próxima cita futura del paciente (cualquiera)
+        if (!nextCita) {
+            nextCita = await prisma.cita.findFirst({
+                where: {
+                    pacienteId: plan.pacienteId,
+                    fecha: { gte: new Date() }
+                },
+                orderBy: { fecha: 'asc' },
+                select: { fecha: true }
+            });
+        }
         if (nextCita) {
             plan.proximaSesion = nextCita.fecha;
         }
         // ---------------------------------------------------------
+
 
         valoraciones = valoraciones.map(v => {
             const vObj = { ...v };
@@ -686,47 +711,89 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
     plan.lineamientosRecientes = plan.notasGenerales ? plan.notasGenerales.split('\n').filter(n=>n.trim()) : [];
     
+
     plan.suplementacionReciente = [];
     plan.suplementosTabla = []; // Tabla completa para PDF (activos + suspendidos)
-    if (plan.suplementosDetalle && Array.isArray(plan.suplementosDetalle)) {
-        // Tabla completa con estado y duración
-        plan.suplementosTabla = plan.suplementosDetalle.map(s => {
-            let duracionStr = '';
-            if (s.fechaInicio) {
-                const start = new Date(s.fechaInicio);
-                const end = s.activo ? new Date() : (s.fechaFin ? new Date(s.fechaFin) : new Date());
-                if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
-                    const diffTime = Math.max(0, end - start);
-                    const diffDays = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-                    const meses = Math.floor(diffDays / 30);
-                    const extra = diffDays % 30;
-                    if (meses > 0) {
-                        duracionStr = `${meses} mes${meses > 1 ? 'es' : ''}${extra > 0 ? ' y ' + extra + ' d' : ''}`;
-                    } else {
-                        duracionStr = `${diffDays} día${diffDays > 1 ? 's' : ''}`;
-                    }
-                }
-            }
-            return {
-                nombre: s.nombre,
-                indicaciones: s.indicaciones,
-                activo: s.activo,
-                estado: s.activo ? 'ACTIVO' : 'SUSPENDIDO',
-                duracion: duracionStr
-            };
-        });
 
-        // Lista legacy para texto plano (solo activos)
-        const activos = plan.suplementosDetalle.filter(s => s.activo);
-        plan.suplementacionReciente = activos.map(s => {
-            const entry = plan.suplementosTabla.find(t => t.nombre === s.nombre);
-            return `${s.nombre}: ${s.indicaciones}${entry ? ' (' + entry.duracion + ')' : ''}`;
+    // ── Resolver fuente de suplementos con trazabilidad ──────────────────────
+    // Prioridad: plan.suplementosDetalle > valoración asociada > texto libre
+    let fuenteSupl = [];
+
+    if (plan.suplementosDetalle && Array.isArray(plan.suplementosDetalle) && plan.suplementosDetalle.length > 0) {
+        // 1. El plan tiene suplementos guardados directamente
+        fuenteSupl = plan.suplementosDetalle;
+    } else if (plan.valoracionId) {
+        // 2. Buscar en la valoración asociada al plan
+        const valConSupl = await prisma.valoracion.findUnique({
+            where: { id: plan.valoracionId },
+            select: { suplementosDetalle: true, suplementacion: true }
         });
-    } else if (ultimaVal?.suplementacion) {
-        plan.suplementacionReciente.push(...ultimaVal.suplementacion.split('\n').filter(s=>s.trim()));
-    } else if (antecedentes?.recomendacionSuplementos) {
-        plan.suplementacionReciente.push(...antecedentes.recomendacionSuplementos.split('\n').filter(s=>s.trim()));
+        if (valConSupl?.suplementosDetalle && Array.isArray(valConSupl.suplementosDetalle) && valConSupl.suplementosDetalle.length > 0) {
+            fuenteSupl = valConSupl.suplementosDetalle;
+        } else if (valConSupl?.suplementacion) {
+            // Texto libre de la valoración
+            plan.suplementacionReciente.push(...valConSupl.suplementacion.split('\n').filter(s => s.trim()));
+        }
+    } else if (plan.pacienteId) {
+        // 3. Buscar en la valoración más reciente del paciente (fallback)
+        const valReciente = await prisma.valoracion.findFirst({
+            where: { pacienteId: plan.pacienteId },
+            orderBy: { fecha: 'desc' },
+            select: { suplementosDetalle: true, suplementacion: true }
+        });
+        if (valReciente?.suplementosDetalle && Array.isArray(valReciente.suplementosDetalle) && valReciente.suplementosDetalle.length > 0) {
+            fuenteSupl = valReciente.suplementosDetalle;
+        } else if (valReciente?.suplementacion) {
+            plan.suplementacionReciente.push(...valReciente.suplementacion.split('\n').filter(s => s.trim()));
+        }
     }
+
+    // Fallback final: antecedentes
+    if (fuenteSupl.length === 0 && plan.suplementacionReciente.length === 0) {
+        if (ultimaVal?.suplementacion) {
+            plan.suplementacionReciente.push(...ultimaVal.suplementacion.split('\n').filter(s => s.trim()));
+        } else if (antecedentes?.recomendacionSuplementos) {
+            plan.suplementacionReciente.push(...antecedentes.recomendacionSuplementos.split('\n').filter(s => s.trim()));
+        }
+    }
+
+    // ── Construir tabla y lista con trazabilidad ──────────────────────────────
+    if (fuenteSupl.length > 0) {
+        const calcDuracion = (s) => {
+            if (!s.fechaInicio) return '';
+            const start = new Date(s.fechaInicio);
+            const end = s.activo ? new Date() : (s.fechaFin ? new Date(s.fechaFin) : new Date());
+            if (isNaN(start.getTime()) || isNaN(end.getTime())) return '';
+            const diffDays = Math.max(1, Math.floor(Math.max(0, end - start) / (1000 * 60 * 60 * 24)));
+            const meses = Math.floor(diffDays / 30);
+            const extra = diffDays % 30;
+            return meses > 0
+                ? `${meses} mes${meses > 1 ? 'es' : ''}${extra > 0 ? ' y ' + extra + ' d' : ''}`
+                : `${diffDays} día${diffDays > 1 ? 's' : ''}`;
+        };
+
+        // Tabla completa — activos primero, luego suspendidos (trazabilidad)
+        plan.suplementosTabla = [
+            ...fuenteSupl.filter(s => s.activo),
+            ...fuenteSupl.filter(s => !s.activo)
+        ].map(s => ({
+            nombre: s.nombre,
+            indicaciones: s.indicaciones || '-',
+            activo: s.activo,
+            estado: s.activo ? 'ACTIVO' : 'SUSPENDIDO',
+            duracion: calcDuracion(s)
+        }));
+
+        // Lista legacy para texto plano (solo activos, con duración)
+        plan.suplementacionReciente = fuenteSupl
+            .filter(s => s.activo)
+            .map(s => {
+                const dur = calcDuracion(s);
+                return `${s.nombre}: ${s.indicaciones || ''}${dur ? ' (' + dur + ')' : ''}`;
+            });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
 
     plan.temarioReciente = [];
     if (ultimaVal?.temarioConsulta) {

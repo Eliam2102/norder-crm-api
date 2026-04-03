@@ -496,6 +496,7 @@ model AlimentoSMAE {
   nombre          String
   grupo           String
   pesoGramos      Float    @map("peso_gramos")
+  unidadBase      String   @default("g") @map("unidad_base")
   porcionCasera   String?  @map("porcion_casera")
   cantidadPorcion Float?   @map("cantidad_porcion")
   unidadPorcion   String?  @map("unidad_porcion")

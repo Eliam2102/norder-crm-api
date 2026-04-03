@@ -373,19 +373,28 @@
                         grouped1[plat].forEach(ing => {
                         %>
                         <div class="menu-item">
+                            <% 
+                            // Construir la cadena de equivalencias (soporta multi-grupo)
+                            // Filtrar equivalencias con cantidad 0 (verduras libres) para no mostrarlas
+                            const eqsM1Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                            // Excluir equivalencias con cantidad 0 (son libres, ej: verduras al gusto)
+                            const eqsM1 = eqsM1Raw.filter(e => parseFloat(e.cantidad) > 0);
+                            const eqStrM1 = eqsM1.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + ');
+                            const cantNum1 = parseFloat(ing.cantidad) || 0;
+                            const unidadM1 = (ing.unidad || '').trim();
+                            %>
                             <% if (meta.soloEquivalencias) { %>
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
+                                <% if(eqStrM1) { %>
+                                    • <%= eqStrM1 %>
                                 <% } %>
                             <% } else { %>
-                                <% const cantNum1 = parseFloat(ing.cantidad) || 0; %>
-                                <% if (cantNum1 > 0) { %>
-                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
-                                    <% } %>
+                                <% if (cantNum1 > 0 && unidadM1 !== '-') { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= unidadM1 %>
+                                    <% if(eqStrM1) { %> (<%= eqStrM1 %>)<% } %>
                                 <% } else if (ing.descripcion) { %>
-                                    <%= ing.descripcion %>
+                                    <%= ing.descripcion %><% if(eqStrM1) { %> (<%= eqStrM1 %>)<% } %>
                                 <% } %>
                             <% } %>
                         </div>
@@ -426,19 +435,28 @@
                         grouped2[plat].forEach(ing => {
                         %>
                         <div class="menu-item">
+                            <% 
+                            // Construir la cadena de equivalencias (soporta multi-grupo)
+                            // Filtrar equivalencias con cantidad 0 (verduras libres) para no mostrarlas
+                            const eqsM2Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                            // Excluir equivalencias con cantidad 0 (son libres, ej: verduras al gusto)
+                            const eqsM2 = eqsM2Raw.filter(e => parseFloat(e.cantidad) > 0);
+                            const eqStrM2 = eqsM2.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + ');
+                            const cantNum2 = parseFloat(ing.cantidad) || 0;
+                            const unidadM2 = (ing.unidad || '').trim();
+                            %>
                             <% if (meta.soloEquivalencias) { %>
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
+                                <% if(eqStrM2) { %>
+                                    • <%= eqStrM2 %>
                                 <% } %>
-                            <% } else { %>
-                                <% const cantNum2 = parseFloat(ing.cantidad) || 0; %>
-                                <% if (cantNum2 > 0) { %>
-                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
-                                    <% } %>
+                                <% } else { %>
+                                <% if (cantNum2 > 0 && unidadM2 !== '-') { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= unidadM2 %>
+                                    <% if(eqStrM2) { %> (<%= eqStrM2 %>)<% } %>
                                 <% } else if (ing.descripcion) { %>
-                                    <%= ing.descripcion %>
+                                    <%= ing.descripcion %><% if(eqStrM2) { %> (<%= eqStrM2 %>)<% } %>
                                 <% } %>
                             <% } %>
                         </div>

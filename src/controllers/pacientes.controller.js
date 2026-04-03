@@ -105,6 +105,29 @@ export const create = async (req, res, next) => {
         const s = suplementacion || {};
         const c24 = consumo24h || h; 
 
+        if (telefono) {
+            // Extracción de los últimos 10 dígitos netos para coincidencia a prueba de balas
+            const telLimpo = telefono.replace(/\D/g, '');
+            if (telLimpo.length >= 10) {
+                const targetTel = telLimpo.slice(-10);
+                const allPacientes = await prisma.paciente.findMany({ select: { id: true, telefono: true } });
+                const existsPhone = allPacientes.find(p => p.telefono && p.telefono.replace(/\D/g, '').endsWith(targetTel));
+                if (existsPhone) {
+                    return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Corrige el teléfono.' });
+                }
+            } else {
+                const exists = await prisma.paciente.findFirst({ where: { telefono } });
+                if (exists) return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente.' });
+            }
+        }
+        
+        if (email) {
+            const existsEmail = await prisma.paciente.findFirst({ where: { email: email.trim() } });
+            if (existsEmail) {
+                return res.status(409).json({ success: false, error: 'Este correo electrónico (email) ya está registrado en otro expediente.' });
+            }
+        }
+
         const nuevo = await prisma.paciente.create({
             data: {
                 nombre,
@@ -349,6 +372,28 @@ export const update = async (req, res, next) => {
         const h = habitos || consumoCalorico || {};
         const s = suplementacion || {};
         const c24 = consumo24h || h;
+
+        if (data.telefono) {
+            const telLimpo = data.telefono.replace(/\D/g, '');
+            if (telLimpo.length >= 10) {
+                const targetTel = telLimpo.slice(-10);
+                const allPacientes = await prisma.paciente.findMany({ select: { id: true, telefono: true } });
+                const existsPhone = allPacientes.find(p => p.id !== id && p.telefono && p.telefono.replace(/\D/g, '').endsWith(targetTel));
+                if (existsPhone) {
+                    return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Revisa la información.' });
+                }
+            } else {
+                const exists = await prisma.paciente.findFirst({ where: { telefono: data.telefono, id: { not: id } } });
+                if (exists) return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente.' });
+            }
+        }
+        
+        if (data.email) {
+            const existsEmail = await prisma.paciente.findFirst({ where: { email: data.email.trim(), id: { not: id } } });
+            if (existsEmail) {
+                return res.status(409).json({ success: false, error: 'Este correo electrónico (email) ya está registrado en otro expediente.' });
+            }
+        }
 
         const updated = await prisma.paciente.update({
             where: { id },
