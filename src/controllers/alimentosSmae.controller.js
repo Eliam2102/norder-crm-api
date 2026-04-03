@@ -29,7 +29,7 @@ export const getAll = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const {
-            nombre, grupo, pesoGramos,
+            nombre, grupo, pesoGramos, unidadBase,
             porcionCasera, cantidadPorcion, unidadPorcion, notas
         } = req.body;
 
@@ -42,6 +42,7 @@ export const create = async (req, res, next) => {
                 nombre: nombre.trim(),
                 grupo,
                 pesoGramos: parseFloat(pesoGramos),
+                unidadBase: unidadBase?.trim() || 'g',
                 porcionCasera: porcionCasera?.trim() || null,
                 cantidadPorcion: cantidadPorcion !== undefined ? parseFloat(cantidadPorcion) : null,
                 unidadPorcion: unidadPorcion?.trim() || null,
@@ -60,7 +61,7 @@ export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
         const {
-            nombre, grupo, pesoGramos,
+            nombre, grupo, pesoGramos, unidadBase,
             porcionCasera, cantidadPorcion, unidadPorcion, notas
         } = req.body;
 
@@ -68,6 +69,7 @@ export const update = async (req, res, next) => {
         if (nombre !== undefined)          dataToUpdate.nombre          = nombre.trim();
         if (grupo !== undefined)           dataToUpdate.grupo           = grupo;
         if (pesoGramos !== undefined)      dataToUpdate.pesoGramos      = parseFloat(pesoGramos);
+        if (unidadBase !== undefined)      dataToUpdate.unidadBase      = unidadBase?.trim() || 'g';
         if (porcionCasera !== undefined)   dataToUpdate.porcionCasera   = porcionCasera?.trim() || null;
         if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = parseFloat(cantidadPorcion);
         if (unidadPorcion !== undefined)   dataToUpdate.unidadPorcion   = unidadPorcion?.trim() || null;
