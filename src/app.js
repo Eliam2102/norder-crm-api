@@ -26,28 +26,52 @@ import agentRoutes from './routes/agent.routes.js';
 const app = express();
 
 // Security Middlewares
-app.use(helmet());
-app.use(cors({
+// crossOriginResourcePolicy se desactiva para permitir requests desde Vercel/otros orígenes
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+const corsOptions = {
     origin: function (origin, callback) {
         if (!origin) return callback(null, true); // Permite herramientas locales y Postman
-        const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173'];
+
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5173',
+        ];
+
+        // Añadir orígenes desde variable de entorno (separados por coma)
         if (process.env.FRONTEND_URL) {
-            allowedOrigins.push(...process.env.FRONTEND_URL.split(','));
+            allowedOrigins.push(
+                ...process.env.FRONTEND_URL.split(',').map(u => u.trim().replace(/^"|"$/g, ''))
+            );
         }
+
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
-        } else {
-            // Permitir localhost dinámico para evitar fricción en desarrollo
-            if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
-                return callback(null, true);
-            }
-            return callback(new Error('No permitido por CORS (Origin no registrado)'));
         }
+
+        // Permitir localhost dinámico en desarrollo
+        if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+            return callback(null, true);
+        }
+
+        // Permitir previews de Vercel (*.vercel.app) como safety net
+        if (origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+
+        console.warn(`[CORS] Origin bloqueado: ${origin}`);
+        return callback(new Error(`No permitido por CORS: ${origin}`));
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
-}));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    optionsSuccessStatus: 200, // Algunos browsers legacy usan 204 que falla
+};
+
+app.use(cors(corsOptions));
+// Manejar explícitamente preflight OPTIONS antes de cualquier otra ruta
+app.options('*', cors(corsOptions));
 
 // Regular body parsers
 app.use(express.json());
