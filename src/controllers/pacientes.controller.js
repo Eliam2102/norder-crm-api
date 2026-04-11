@@ -26,7 +26,8 @@ export const getAll = async (req, res, next) => {
                         { numeroValoracion: 'desc' }
                     ],
                     include: {
-                        barrido: { select: { id: true, kcalTotal: true, porciones: true } }
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true } },
+                        citas: { select: { id: true, fecha: true } }
                     }
                 },
                 planes: {
@@ -67,7 +68,10 @@ export const getAll = async (req, res, next) => {
                     hasBarrido,
                     estadoFlujo,
                     planId: planAsociado?.id || null,
-                    estadoEnvio: planAsociado?.estadoEnvio || null
+                    estadoEnvio: planAsociado?.estadoEnvio || null,
+                    // true si existe al menos una cita de seguimiento para esta valoración
+                    tieneCita: Array.isArray(v.citas) && v.citas.length > 0,
+                    proximaCita: Array.isArray(v.citas) && v.citas.length > 0 ? v.citas[0].fecha : null,
                 };
             });
 
