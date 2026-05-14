@@ -13,11 +13,11 @@ export const getSlots = async (req, res) => {
       return res.status(400).json({ error: 'Faltan parámetros requeridos (eventTypeId, startTime, endTime)' });
     }
 
-    const response = await axios.get(`${CALCOM_API_URL}/slots`, {
+    const response = await axios.get(`${CALCOM_API_URL}/slots/available`, {
       params: {
         eventTypeId,
-        start: startTime,
-        end: endTime,
+        startTime: startTime,
+        endTime: endTime,
         timeZone: 'America/Merida',
       },
       headers: {
