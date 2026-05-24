@@ -71,7 +71,7 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 // Manejar explícitamente preflight OPTIONS antes de cualquier otra ruta
-app.options('/{*path}', cors(corsOptions));
+app.options('/{*splat}', cors(corsOptions));
 
 // Regular body parsers
 app.use(express.json());
