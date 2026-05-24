@@ -1,20 +1,62 @@
 import prisma from '../lib/prisma.js';
 import { ok } from '../utils/response.js';
 
+const getMeridaDate = () => {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Merida',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: false
+    });
+    
+    const parts = formatter.formatToParts(now);
+    const partValues = {};
+    parts.forEach(p => partValues[p.type] = p.value);
+    
+    return new Date(
+        parseInt(partValues.year),
+        parseInt(partValues.month) - 1,
+        parseInt(partValues.day),
+        parseInt(partValues.hour),
+        parseInt(partValues.minute),
+        parseInt(partValues.second)
+    );
+};
+
+const getMeridaUtcBoundaries = () => {
+    const ahoraMerida = getMeridaDate();
+    const year = ahoraMerida.getFullYear();
+    const month = ahoraMerida.getMonth();
+    const day = ahoraMerida.getDate();
+
+    // Mérida is UTC-6 all year round.
+    // 00:00:00 local time = 06:00:00 UTC
+    const inicioHoy = new Date(Date.UTC(year, month, day, 6, 0, 0));
+    
+    // 23:59:59 local time = 05:59:59 UTC of the next day
+    const finHoy = new Date(Date.UTC(year, month, day, 6, 0, 0) + 86399000);
+
+    // 1st day of the month at 00:00:00 local time = 06:00:00 UTC
+    const inicioMes = new Date(Date.UTC(year, month, 1, 6, 0, 0));
+
+    // Jan 1st of the year at 00:00:00 local time = 06:00:00 UTC
+    const inicioAnio = new Date(Date.UTC(year, 0, 1, 6, 0, 0));
+
+    return { inicioHoy, finHoy, inicioMes, inicioAnio };
+};
+
 export const getMetricas = async (req, res, next) => {
     try {
         // Force no-cache to avoid 304 issues reported
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         
         const ahora = new Date();
-        const hace30d = new Date();
-        hace30d.setDate(hace30d.getDate() - 30);
-        
-        const hoy = new Date();
-        const inicioHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
-        const finHoy = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59);
-        const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
-        const inicioAnio = new Date(hoy.getFullYear(), 0, 1);
+        const { inicioHoy, finHoy, inicioMes, inicioAnio } = getMeridaUtcBoundaries();
 
         // 1. Data Retrieval
         const [
@@ -55,14 +97,26 @@ export const getMetricas = async (req, res, next) => {
         }));
 
         // 2. Tendencia Maestre (Last 6 Months)
+        const ahoraMerida = getMeridaDate();
         const mesesTrend = [];
+        const meridaOffsetMs = 6 * 60 * 60 * 1000;
+        
         for (let i = 5; i >= 0; i--) {
-            const d = new Date(ahora.getFullYear(), ahora.getMonth() - i, 1);
-            const mNombre = d.toLocaleString('es-ES', { month: 'short' }).toUpperCase();
+            const year = ahoraMerida.getFullYear();
+            const month = ahoraMerida.getMonth() - i;
+            
+            const localInicio = new Date(year, month, 1);
+            const localFin = new Date(year, month + 1, 0, 23, 59, 59);
+            
+            const inicio = new Date(localInicio.getTime() + meridaOffsetMs);
+            const fin = new Date(localFin.getTime() + meridaOffsetMs);
+            
+            const mNombre = localInicio.toLocaleString('es-ES', { month: 'short' }).toUpperCase();
+            
             mesesTrend.push({
-                nombre: mNombre,
-                inicio: d,
-                fin: new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59)
+                nombre: mNombre.replace('.', ''),
+                inicio,
+                fin
             });
         }
 
