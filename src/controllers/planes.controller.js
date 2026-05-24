@@ -15,15 +15,15 @@ export const getAll = async (req, res, next) => {
         // 1. Prioridad: Si hay un pacienteId en la URL, filtramos solo por él
         if (pacienteId) {
             whereClause = { pacienteId };
-        } 
+        }
         // 2. Si es /api/planes?tipo=base -> Solo Plantillas (Biblioteca)
         else if (tipo === 'base') {
             whereClause = { pacienteId: null };
-        } 
+        }
         // 3. Si es /api/planes?tipo=todos -> Todo el historial global
         else if (tipo === 'todos') {
             whereClause = {};
-        } 
+        }
         // 4. Por defecto en /api/planes -> Solo Plantillas (Seguridad de Biblioteca)
         else {
             whereClause = { pacienteId: null };
@@ -57,11 +57,11 @@ export const getActivo = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const pacienteId = req.params.pacienteId || req.body.pacienteId || null;
-        const { 
-            menus, 
+        const {
+            menus,
             nombre,
             nombrePlan,
-            tipoPlan, 
+            tipoPlan,
             tipo,
             calorias,
             proteinasPct,
@@ -75,7 +75,7 @@ export const create = async (req, res, next) => {
             suplementosDetalle,
             ...extra
         } = req.body;
-        
+
         // Si es un plan para un paciente, archivamos los anteriores
         if (pacienteId) {
             await prisma.plan.updateMany({
@@ -254,7 +254,7 @@ export const create = async (req, res, next) => {
                                         ? iData.equivalencias
                                         : null
                                 }
-                            }).catch(() => {}); // Ignorar errores duplicados sin crashear
+                            }).catch(() => { }); // Ignorar errores duplicados sin crashear
                         }
                     }
 
@@ -278,10 +278,10 @@ export const create = async (req, res, next) => {
                                         eqGrupo: i.eqGrupo || ''
                                     }))
                                 }
-                            }).catch(() => {});
+                            }).catch(() => { });
                         }
                     }
-                } catch(autoErr) {
+                } catch (autoErr) {
                     console.warn('[AutoCapture] Error silencioso al guardar alimentos/platillos:', autoErr.message);
                 }
             })();
@@ -303,7 +303,7 @@ export const getById = async (req, res, next) => {
     try {
         const plan = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
-            include: { 
+            include: {
                 menus: { include: { tiemposComida: { include: { ingredientes: true } } } },
                 paciente: {
                     include: {
@@ -324,8 +324,8 @@ export const getById = async (req, res, next) => {
 export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { 
-            menus, 
+        const {
+            menus,
             nombre,
             nombrePlan,
             tipoPlan,
@@ -390,7 +390,7 @@ export const update = async (req, res, next) => {
                 dataUpdate.grasasGrKg = pesoKg > 0 ? gGr / pesoKg : null;
             }
         }
-        
+
         if (proximaSesion) {
             let pDate = new Date(`${proximaSesion}T${proximaSesionHora || '00:00'}:00`);
             if (!isNaN(pDate.getTime())) dataUpdate.proximaSesion = pDate;
@@ -416,8 +416,8 @@ export const update = async (req, res, next) => {
                     });
                     if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
                         for (const [iIdx, iData] of tData.ingredientes.entries()) {
-                            await prisma.planIngrediente.create({ 
-                                data: { 
+                            await prisma.planIngrediente.create({
+                                data: {
                                     tiempoComidaId: tiempo.id,
                                     descripcion: iData.descripcion || '',
                                     cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
@@ -429,7 +429,7 @@ export const update = async (req, res, next) => {
                                     equivalencias: iData.equivalencias || null,
                                     smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
                                     orden: iIdx + 1
-                                } 
+                                }
                             });
                         }
                     }
@@ -490,7 +490,7 @@ export const update = async (req, res, next) => {
                                     esPersonalizado: true,
                                     equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0 ? iData.equivalencias : null
                                 }
-                            }).catch(() => {});
+                            }).catch(() => { });
                         }
                     }
 
@@ -514,10 +514,10 @@ export const update = async (req, res, next) => {
                                         equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
                                     }))
                                 }
-                            }).catch(() => {});
+                            }).catch(() => { });
                         }
                     }
-                } catch(autoErr) {
+                } catch (autoErr) {
                     console.warn('[AutoCapture/Update] Error silencioso:', autoErr.message);
                 }
             })();
@@ -538,7 +538,7 @@ export const update = async (req, res, next) => {
 const enrichPlanForPdf = async (plan, metaOverride = null) => {
     let valoraciones = [];
     if (plan.pacienteId) {
-        
+
         // 1. Determinar la "máquina del tiempo": límite de fecha para el historial
         let dateLimit = new Date();
         if (plan.valoracionId) {
@@ -556,21 +556,21 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         }
 
         let rawValoraciones = await prisma.valoracion.findMany({
-            where: { 
+            where: {
                 pacienteId: plan.pacienteId,
                 fecha: { lte: dateLimit } // Solo valoraciones hasta esa fecha
             },
             orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
             take: 20, // Tomamos más para garantizar 7 únicas después de de-duplicar
-            select: { 
+            select: {
                 id: true,
-                fecha: true, 
-                pesoActual: true, 
+                fecha: true,
+                pesoActual: true,
                 estatura: true,
-                imc: true, 
+                imc: true,
                 pctGrasaCorp: true,
                 pctGrasa2comp: true,
-                masaMagra: true, 
+                masaMagra: true,
                 masaGrasaReal: true,
                 kgGrasa2comp: true,
                 numeroValoracion: true,
@@ -600,10 +600,10 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 }
             }
         });
-        
+
         // Reloj histórico: Solo mostramos las últimas 7.
         valoraciones = rawValoraciones.slice(0, 7);
-        
+
         const historicoPlanes = await prisma.plan.findMany({
             where: { pacienteId: plan.pacienteId },
             orderBy: { fechaCreacion: 'desc' },
@@ -641,7 +641,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
         valoraciones = valoraciones.map(v => {
             const vObj = { ...v };
-            
+
             // Helper for Decimal to Number conversion
             const toNum = (val) => {
                 if (val == null) return null;
@@ -653,14 +653,14 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             vObj.pesoActual = toNum(v.pesoActual);
             vObj.estatura = toNum(v.estatura);
             vObj.imc = toNum(v.imc);
-            
+
             // Fat fallbacks: 4-comp -> 2-comp
             vObj.pctGrasaCorp = toNum(v.pctGrasaCorp) ?? toNum(v.pctGrasa2comp);
             vObj.masaGrasaReal = toNum(v.masaGrasaReal) ?? toNum(v.kgGrasa2comp);
             vObj.masaMagra = toNum(v.masaMagra);
 
             let energiaFinal = plan.calorias;
-            
+
             // Prioridad de energía: Ajuste manual en Barrido > Plan asignado > Plan actual del paciente
             if (v.barrido && v.barrido.kcalTotal) {
                 energiaFinal = v.barrido.kcalTotal;
@@ -673,10 +673,10 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             }
 
             vObj.energia = toNum(energiaFinal);
-            
+
             // Mapeo de Somatotipo con Fallback según requerimiento
             const hasEndoMesoEcto = v.endomorfico != null || v.mesomorfico != null || v.ectomorfico != null;
-            
+
             if (hasEndoMesoEcto) {
                 // 1. Somatotipo calculado (Endo-Meso-Ecto)
                 const comps = [
@@ -709,8 +709,8 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         });
     }
 
-    plan.lineamientosRecientes = plan.notasGenerales ? plan.notasGenerales.split('\n').filter(n=>n.trim()) : [];
-    
+    plan.lineamientosRecientes = plan.notasGenerales ? plan.notasGenerales.split('\n').filter(n => n.trim()) : [];
+
 
     plan.suplementacionReciente = [];
     plan.suplementosTabla = []; // Tabla completa para PDF (activos + suspendidos)
@@ -813,7 +813,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
     }
 
     plan.hidratacionReciente = antecedentes?.agua ? [antecedentes.agua] : [];
-    
+
     plan.alimentosPersonales = [];
     if (antecedentes?.alimentosGustan) plan.alimentosPersonales.push("Preferencias: " + antecedentes.alimentosGustan);
     if (antecedentes?.alergias) plan.alimentosPersonales.push("Alergias: " + antecedentes.alergias);
@@ -841,9 +841,9 @@ export const generatePdf = async (req, res, next) => {
     try {
         let planRow = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
-            include: { 
+            include: {
                 paciente: true,
-                menus: { include: { tiemposComida: { include: { ingredientes: true } } } } 
+                menus: { include: { tiemposComida: { include: { ingredientes: true } } } }
             }
         });
 
@@ -852,9 +852,9 @@ export const generatePdf = async (req, res, next) => {
         console.log("[generatePdf] Plan ID:", planRow.id, "| proximaSesion:", planRow.proximaSesion);
 
         const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
-        
-        const fileNamePart = planEnriquecido.paciente 
-            ? planEnriquecido.paciente.nombre.replace(/ /g, '_') 
+
+        const fileNamePart = planEnriquecido.paciente
+            ? planEnriquecido.paciente.nombre.replace(/ /g, '_')
             : (planEnriquecido.nombre || 'Plantilla').replace(/ /g, '_');
 
         // Configurar headers para que el navegador lo identifique como PDF y lo abra (inline)
@@ -890,9 +890,9 @@ export const generatePdfPreview = async (req, res, next) => {
         const metaOverride = req.body;
         const planRow = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
-            include: { 
+            include: {
                 paciente: true,
-                menus: { include: { tiemposComida: { include: { ingredientes: true } } } } 
+                menus: { include: { tiemposComida: { include: { ingredientes: true } } } }
             }
         });
 
@@ -902,9 +902,9 @@ export const generatePdfPreview = async (req, res, next) => {
         console.log("Valoraciones obtained:", valoraciones?.length);
 
         const filePath = await pdfService.generarPlanPDF(planEnriquecido, valoraciones);
-        
-        const fileNamePart = planEnriquecido.paciente 
-            ? planEnriquecido.paciente.nombre.replace(/ /g, '_') 
+
+        const fileNamePart = planEnriquecido.paciente
+            ? planEnriquecido.paciente.nombre.replace(/ /g, '_')
             : (planEnriquecido.nombre || 'Plantilla').replace(/ /g, '_');
 
         res.setHeader('Content-Type', 'application/pdf');
@@ -916,7 +916,7 @@ export const generatePdfPreview = async (req, res, next) => {
         res.on('finish', () => {
             try {
                 fs.unlinkSync(filePath);
-            } catch (unlinkErr) {}
+            } catch (unlinkErr) { }
         });
 
     } catch (err) {
@@ -966,10 +966,10 @@ export const sendPlan = async (req, res, next) => {
         // 5. Enviar correo y WhatsApp mediante N8N Webhook
         const nombreArchivo = `plan-${(planEnriquecido.nombre || 'alimenticio').replace(/ /g, '_')}.pdf`;
         const webhookUrl = process.env.N8N_WEBHOOK_URL;
-        
+
         let statusMensajes = 'no-definido';
         let n8nResponseText = '';
-        
+
         if (webhookUrl) {
             try {
                 const formData = new FormData();
@@ -978,13 +978,13 @@ export const sendPlan = async (req, res, next) => {
 
                 let telefonoLimpio = (paciente.telefono || '').replace(/\D/g, '');
                 if (telefonoLimpio && telefonoLimpio.length <= 10) {
-                    telefonoLimpio = '52' + telefonoLimpio; 
+                    telefonoLimpio = '52' + telefonoLimpio;
                 }
                 formData.append('telefono', telefonoLimpio);
 
                 formData.append('paciente_nombre', paciente.nombre || '');
                 formData.append('plan_nombre', planEnriquecido.nombre || '');
-                
+
                 console.log(`[sendPlan] Preparando envío a N8N: ${webhookUrl}`);
                 console.log(`[sendPlan] Tamaño del PDF: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
 
@@ -1003,7 +1003,7 @@ export const sendPlan = async (req, res, next) => {
 
                 statusMensajes = 'ok';
                 console.log('[sendPlan] PDF y Meta-datos emitidos a N8N Webhook con éxito.');
-                
+
                 // Intento parsear la respuesta por si N8N nos da un reporte de Email/WhatsApp individual
                 try {
                     const jsonRes = response.data;
@@ -1011,7 +1011,7 @@ export const sendPlan = async (req, res, next) => {
                     if (jsonRes && (jsonRes.email === 'error' || jsonRes.whatsapp === 'error')) {
                         statusMensajes = 'advertencia';
                     }
-                } catch(e) {}
+                } catch (e) { }
 
             } catch (err) {
                 // Determine if it was an HTTP error or network error
@@ -1021,7 +1021,7 @@ export const sendPlan = async (req, res, next) => {
                 } else if (err.request) {
                     errorMsg = `Sin respuesta del servidor (${err.code})`;
                 }
-                
+
                 console.error(`[sendPlan] Falló ejecución hacia N8N:`, errorMsg);
                 statusMensajes = 'error';
                 return error(res, `Fallo al comunicarse con el orquestador (N8N): ${errorMsg}`, 502);
@@ -1143,7 +1143,7 @@ export const asignarPlan = async (req, res, next) => {
                 }
             }
         });
-        
+
         return ok(res, nuevo, 201);
     } catch (err) {
         next(err);
@@ -1154,12 +1154,12 @@ export const updatePdfMeta = async (req, res, next) => {
     try {
         const { id } = req.params;
         const meta = req.body;
-        
+
         const plan = await prisma.plan.update({
             where: { id },
             data: { pdfCustomMeta: meta }
         });
-        
+
         return ok(res, plan);
     } catch (err) {
         next(err);
