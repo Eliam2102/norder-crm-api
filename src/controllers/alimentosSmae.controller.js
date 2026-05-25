@@ -29,7 +29,7 @@ export const getAll = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const {
-            nombre, grupo, pesoGramos, unidadBase,
+            nombre, grupo, equivalentesBase, pesoGramos, unidadBase,
             porcionCasera, cantidadPorcion, unidadPorcion, notas, equivalencias
         } = req.body;
 
@@ -41,6 +41,7 @@ export const create = async (req, res, next) => {
             data: {
                 nombre: nombre.trim(),
                 grupo,
+                equivalentesBase: equivalentesBase !== undefined ? parseFloat(equivalentesBase) : 1,
                 pesoGramos: parseFloat(pesoGramos),
                 unidadBase: unidadBase?.trim() || 'g',
                 porcionCasera: porcionCasera?.trim() || null,
@@ -62,14 +63,15 @@ export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
         const {
-            nombre, grupo, pesoGramos, unidadBase,
+            nombre, grupo, equivalentesBase, pesoGramos, unidadBase,
             porcionCasera, cantidadPorcion, unidadPorcion, notas, equivalencias
         } = req.body;
 
         const dataToUpdate = {};
-        if (nombre !== undefined)          dataToUpdate.nombre          = nombre.trim();
-        if (grupo !== undefined)           dataToUpdate.grupo           = grupo;
-        if (pesoGramos !== undefined)      dataToUpdate.pesoGramos      = parseFloat(pesoGramos);
+        if (nombre !== undefined)            dataToUpdate.nombre           = nombre.trim();
+        if (grupo !== undefined)             dataToUpdate.grupo            = grupo;
+        if (equivalentesBase !== undefined)  dataToUpdate.equivalentesBase = parseFloat(equivalentesBase);
+        if (pesoGramos !== undefined)        dataToUpdate.pesoGramos       = parseFloat(pesoGramos);
         if (unidadBase !== undefined)      dataToUpdate.unidadBase      = unidadBase?.trim() || 'g';
         if (porcionCasera !== undefined)   dataToUpdate.porcionCasera   = porcionCasera?.trim() || null;
         if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = parseFloat(cantidadPorcion);

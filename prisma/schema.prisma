@@ -492,11 +492,12 @@ model BarridoEquivalencias {
 }
 
 model AlimentoSMAE {
-  id              String   @id @default(cuid())
-  nombre          String
-  grupo           String
-  pesoGramos      Float    @map("peso_gramos")
-  unidadBase      String   @default("g") @map("unidad_base")
+  id               String   @id @default(cuid())
+  nombre           String
+  grupo            String
+  equivalentesBase Float    @default(1) @map("equivalentes_base")
+  pesoGramos       Float    @map("peso_gramos")
+  unidadBase       String   @default("g") @map("unidad_base")
   porcionCasera   String?  @map("porcion_casera")
   cantidadPorcion Float?   @map("cantidad_porcion")
   unidadPorcion   String?  @map("unidad_porcion")
