@@ -59,37 +59,22 @@ export const getMetricas = async (req, res, next) => {
         const { inicioHoy, finHoy, inicioMes, inicioAnio } = getMeridaUtcBoundaries();
 
         // 1. Data Retrieval
-        const [
-            pacientesTotales, 
-            pacientesNuevosMes,
-            pacientesNuevosHoy,
-            planesNutricionales, 
-            consultasTotales,
-            consultasMes,
-            consultasHoy,
-            consultasAnio,
-            config, 
-            basica, 
-            premium, 
-            distribucionObjetivos
-        ] = await Promise.all([
-            prisma.paciente.count(),
-            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
-            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
-            prisma.plan.count(),
-            prisma.valoracion.count(),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioMes } } }),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioHoy, lte: finHoy } } }),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioAnio } } }),
-            prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
-            prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
-            prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
-            prisma.datosEjercicio.groupBy({
-                by: ['objetivo'],
-                _count: { objetivo: true },
-                where: { objetivo: { not: null } }
-            })
-        ]);
+        const pacientesTotales = await prisma.paciente.count();
+        const pacientesNuevosMes = await prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } });
+        const pacientesNuevosHoy = await prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } });
+        const planesNutricionales = await prisma.plan.count();
+        const consultasTotales = await prisma.valoracion.count();
+        const consultasMes = await prisma.valoracion.count({ where: { createdAt: { gte: inicioMes } } });
+        const consultasHoy = await prisma.valoracion.count({ where: { createdAt: { gte: inicioHoy, lte: finHoy } } });
+        const consultasAnio = await prisma.valoracion.count({ where: { createdAt: { gte: inicioAnio } } });
+        const config = await prisma.configuracion.findUnique({ where: { id: 'singleton' } });
+        const basica = await prisma.paciente.count({ where: { nivelMembresia: 'basica' } });
+        const premium = await prisma.paciente.count({ where: { nivelMembresia: 'premium' } });
+        const distribucionObjetivos = await prisma.datosEjercicio.groupBy({
+            by: ['objetivo'],
+            _count: { objetivo: true },
+            where: { objetivo: { not: null } }
+        });
 
         const objetivos = distribucionObjetivos.map(o => ({
             nombre: o.objetivo,
@@ -120,14 +105,13 @@ export const getMetricas = async (req, res, next) => {
             });
         }
 
-        const tendenciaMaestre = await Promise.all(mesesTrend.map(async (m) => {
-            const [p, v, pl] = await Promise.all([
-                prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } }),
-                prisma.valoracion.count({ where: { createdAt: { gte: m.inicio, lte: m.fin } } }),
-                prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } })
-            ]);
-            return { mes: m.nombre, pacientes: p, consultas: v, planes: pl };
-        }));
+        const tendenciaMaestre = [];
+        for (const m of mesesTrend) {
+            const p = await prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } });
+            const v = await prisma.valoracion.count({ where: { createdAt: { gte: m.inicio, lte: m.fin } } });
+            const pl = await prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } });
+            tendenciaMaestre.push({ mes: m.nombre, pacientes: p, consultas: v, planes: pl });
+        }
 
         // 3. Clinical Analysis & KPIs
         const pacientes = await prisma.paciente.findMany({

@@ -92,6 +92,7 @@ model Antecedentes {
   alergias                 String?
   patologia                String?
   cirugias                 String?
+  farmacos                 String?
   estrenimiento            String?
   consumoAlcohol           String? @map("consumo_alcohol")
   tabaco                   String?
@@ -100,6 +101,7 @@ model Antecedentes {
   signosYSintomas          String? @map("signos_y_sintomas")
   historialProductos       String? @map("historial_productos")
   recomendacionSuplementos String? @map("recomendacion_suplementos")
+  suplementosDetalle       Json?   @map("suplementos_detalle")
 
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
@@ -205,6 +207,8 @@ model Valoracion {
   edadMetabolica          Decimal? @map("edad_metabolica") @db.Decimal(12, 4)
   // Notas
   comentarios             String?
+  notasLibres             String?  @map("notas_libres")
+  adjuntosJson            Json?    @map("adjuntos_json")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
