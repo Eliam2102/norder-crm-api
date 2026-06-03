@@ -114,8 +114,10 @@ export const create = async (req, res, next) => {
             const telLimpo = telefono.replace(/\D/g, '');
             if (telLimpo.length >= 10) {
                 const targetTel = telLimpo.slice(-10);
-                const allPacientes = await prisma.paciente.findMany({ select: { id: true, telefono: true } });
-                const existsPhone = allPacientes.find(p => p.telefono && p.telefono.replace(/\D/g, '').endsWith(targetTel));
+                const existsPhone = await prisma.paciente.findFirst({
+                    where: { telefono: { endsWith: targetTel } },
+                    select: { id: true }
+                });
                 if (existsPhone) {
                     return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Corrige el teléfono.' });
                 }
@@ -390,8 +392,10 @@ export const update = async (req, res, next) => {
             const telLimpo = data.telefono.replace(/\D/g, '');
             if (telLimpo.length >= 10) {
                 const targetTel = telLimpo.slice(-10);
-                const allPacientes = await prisma.paciente.findMany({ select: { id: true, telefono: true } });
-                const existsPhone = allPacientes.find(p => p.id !== id && p.telefono && p.telefono.replace(/\D/g, '').endsWith(targetTel));
+                const existsPhone = await prisma.paciente.findFirst({
+                    where: { telefono: { endsWith: targetTel }, id: { not: id } },
+                    select: { id: true }
+                });
                 if (existsPhone) {
                     return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Revisa la información.' });
                 }
