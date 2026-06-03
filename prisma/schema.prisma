@@ -24,6 +24,9 @@ model Paciente {
   suscripcionInicio    DateTime? @map("suscripcion_inicio") @db.Date
   suscripcionFin       DateTime? @map("suscripcion_fin") @db.Date
 
+  @@index([nivelMembresia])
+  @@index([fechaRegistro])
+
   datosEjercicio   DatosEjercicio?
   consumoCalorico  ConsumoCalorico?
   antecedentes     Antecedentes?
@@ -92,6 +95,7 @@ model Antecedentes {
   alergias                 String?
   patologia                String?
   cirugias                 String?
+  farmacos                 String?
   estrenimiento            String?
   consumoAlcohol           String? @map("consumo_alcohol")
   tabaco                   String?
@@ -100,6 +104,7 @@ model Antecedentes {
   signosYSintomas          String? @map("signos_y_sintomas")
   historialProductos       String? @map("historial_productos")
   recomendacionSuplementos String? @map("recomendacion_suplementos")
+  suplementosDetalle       Json?   @map("suplementos_detalle")
 
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
@@ -205,6 +210,8 @@ model Valoracion {
   edadMetabolica          Decimal? @map("edad_metabolica") @db.Decimal(12, 4)
   // Notas
   comentarios             String?
+  notasLibres             String?  @map("notas_libres")
+  adjuntosJson            Json?    @map("adjuntos_json")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
@@ -218,6 +225,8 @@ model Valoracion {
   barrido         BarridoEquivalencias?
   citas           Cita[]
 
+  @@index([pacienteId])
+  @@index([fecha])
   @@map("valoracion")
 }
 
@@ -232,6 +241,8 @@ model TemarioConsulta {
   valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
   paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
+  @@index([valoracionId])
+  @@index([pacienteId])
   @@map("temario_consulta")
 }
 
@@ -265,6 +276,7 @@ model Revision {
   valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
   planes     Plan[]
 
+  @@index([pacienteId])
   @@map("revision")
 }
 
@@ -310,6 +322,10 @@ model Plan {
   valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
   menus      PlanMenu[]
 
+  @@index([pacienteId])
+  @@index([valoracionId])
+  @@index([fechaCreacion])
+  @@index([estadoEnvio])
   @@map("plan")
 }
 
@@ -323,6 +339,7 @@ model PlanMenu {
   plan          Plan               @relation(fields: [planId], references: [id], onDelete: Cascade)
   tiemposComida PlanTiempoComida[]
 
+  @@index([planId])
   @@map("plan_menu")
 }
 
@@ -340,6 +357,7 @@ model PlanTiempoComida {
   menu         PlanMenu          @relation(fields: [menuId], references: [id], onDelete: Cascade)
   ingredientes PlanIngrediente[]
 
+  @@index([menuId])
   @@map("plan_tiempo_comida")
 }
 
@@ -359,6 +377,7 @@ model PlanIngrediente {
 
   tiempoComida PlanTiempoComida @relation(fields: [tiempoComidaId], references: [id], onDelete: Cascade)
 
+  @@index([tiempoComidaId])
   @@map("plan_ingrediente")
 }
 
@@ -449,6 +468,8 @@ model Requerimiento {
   paciente   Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
 
+  @@index([pacienteId])
+  @@index([valoracionId])
   @@map("requerimiento")
 }
 
@@ -488,6 +509,7 @@ model BarridoEquivalencias {
   paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
 
+  @@index([pacienteId])
   @@map("barrido_equivalencias")
 }
 
@@ -551,5 +573,8 @@ model Cita {
   paciente   Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
 
+  @@index([pacienteId])
+  @@index([valoracionId])
+  @@index([fecha])
   @@map("cita")
 }

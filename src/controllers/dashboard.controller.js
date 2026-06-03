@@ -58,21 +58,12 @@ export const getMetricas = async (req, res, next) => {
         const ahora = new Date();
         const { inicioHoy, finHoy, inicioMes, inicioAnio } = getMeridaUtcBoundaries();
 
-        // 1. Data Retrieval
+        // 1. Data Retrieval — batch all counts in one round trip
         const [
-            pacientesTotales, 
-            pacientesNuevosMes,
-            pacientesNuevosHoy,
-            planesNutricionales, 
-            consultasTotales,
-            consultasMes,
-            consultasHoy,
-            consultasAnio,
-            config, 
-            basica, 
-            premium, 
-            distribucionObjetivos
-        ] = await Promise.all([
+            pacientesTotales, pacientesNuevosMes, pacientesNuevosHoy,
+            planesNutricionales, consultasTotales, consultasMes,
+            consultasHoy, consultasAnio, config, basica, premium
+        ] = await prisma.$transaction([
             prisma.paciente.count(),
             prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
             prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
@@ -84,12 +75,12 @@ export const getMetricas = async (req, res, next) => {
             prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
-            prisma.datosEjercicio.groupBy({
-                by: ['objetivo'],
-                _count: { objetivo: true },
-                where: { objetivo: { not: null } }
-            })
         ]);
+        const distribucionObjetivos = await prisma.datosEjercicio.groupBy({
+            by: ['objetivo'],
+            _count: { objetivo: true },
+            where: { objetivo: { not: null } }
+        });
 
         const objetivos = distribucionObjetivos.map(o => ({
             nombre: o.objetivo,
@@ -120,24 +111,31 @@ export const getMetricas = async (req, res, next) => {
             });
         }
 
-        const tendenciaMaestre = await Promise.all(mesesTrend.map(async (m) => {
-            const [p, v, pl] = await Promise.all([
-                prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } }),
-                prisma.valoracion.count({ where: { createdAt: { gte: m.inicio, lte: m.fin } } }),
-                prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } })
-            ]);
-            return { mes: m.nombre, pacientes: p, consultas: v, planes: pl };
+        // Batch all 6-month trend queries in one round trip (18 queries → 1)
+        const trendQueries = mesesTrend.flatMap(m => [
+            prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } }),
+            prisma.valoracion.count({ where: { createdAt: { gte: m.inicio, lte: m.fin } } }),
+            prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } }),
+        ]);
+        const trendResults = await prisma.$transaction(trendQueries);
+        const tendenciaMaestre = mesesTrend.map((m, i) => ({
+            mes: m.nombre,
+            pacientes: trendResults[i * 3],
+            consultas: trendResults[i * 3 + 1],
+            planes: trendResults[i * 3 + 2],
         }));
 
-        // 3. Clinical Analysis & KPIs
+        // 3. Clinical Analysis & KPIs (capped at 200 most recent patients)
         const pacientes = await prisma.paciente.findMany({
+            orderBy: { fechaRegistro: 'desc' },
+            take: 200,
             include: {
                 antecedentes: { select: { patologia: true } },
                 valoraciones: {
                     orderBy: { fecha: 'desc' },
-                    take: 1,
-                    select: { 
-                        fecha: true, 
+                    take: 2,
+                    select: {
+                        fecha: true,
                         deficitMusculo: true,
                         pctGrasaCorp: true
                     }
@@ -211,6 +209,8 @@ export const getAlertas = async (req, res, next) => {
         const ahora = new Date();
         
         const pacientes = await prisma.paciente.findMany({
+            orderBy: { fechaRegistro: 'desc' },
+            take: 300,
             select: {
                 id: true,
                 nombre: true,
@@ -232,8 +232,6 @@ export const getAlertas = async (req, res, next) => {
                 }
             }
         });
- 
-        console.log('DEBUG DASHBOARD PACIENTES:', JSON.stringify(pacientes, null, 2));
 
         const alertasRaw = [];
 

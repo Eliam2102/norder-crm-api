@@ -630,13 +630,24 @@
         .ic-abbr {
             width: 100%;
             border-collapse: collapse;
-            font-size: 7.5px;
+            font-size: 7px;
             table-layout: fixed;
             margin-top: 3px;
             page-break-inside: avoid;
         }
-        .ic-abbr td { border: 1px solid #000; padding: 1.5px 3px; vertical-align: top; }
-        .ic-abbr .abbr-hdr { font-weight: bold; background: #f0f0f0; font-size: 8px; padding: 2px; }
+        .ic-abbr td { border: 1px solid #ddd; padding: 1.5px 3px; vertical-align: top; }
+        .ic-abbr .abbr-hdr {
+            font-weight: bold;
+            background-color: #f2f2f2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            font-size: 7.5px;
+            padding: 2px 3px;
+            text-align: center;
+            text-transform: uppercase;
+            color: #444;
+            border: 1px solid #ddd;
+        }
     </style>
 
     <!-- ═══ Tabla principal ═══════════════════════════════════════════════════ -->
@@ -754,7 +765,7 @@
 
     <!-- ═══ Abreviaciones ═══════════════════════════════════════════════════ -->
     <table class="ic-abbr">
-        <tr><td colspan="3" class="abbr-hdr">Abreviaciones</td></tr>
+        <tr><td colspan="3" class="ic-title">Abreviaciones</td></tr>
         <tr>
             <td><strong>IMC:</strong> índice de masa corporal<br><strong>MLG:</strong> masa libre de grasa</td>
             <td><strong>Eq:</strong> equivalentes<br><strong>AOA:</strong> alimentos de origen animal<br><strong>Cdita:</strong> cucharadita &nbsp; <strong>Cda:</strong> cucharada</td>
