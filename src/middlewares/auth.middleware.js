@@ -23,7 +23,7 @@ export const authMiddleware = (req, res, next) => {
  */
 export const requireAdmin = (req, res, next) => {
     if (!req.user) return error(res, 'No autenticado', 401);
-    if (req.user.rol !== 'admin') return error(res, 'Acceso denegado: se requiere rol de administrador', 403);
+    if (req.user.rol !== 'admin' && req.user.role !== 'admin') return error(res, 'Acceso denegado: se requiere rol de administrador', 403);
     next();
 };
 
@@ -35,7 +35,7 @@ export const requirePermiso = (modulo, accion = 'read') => (req, res, next) => {
     if (!req.user) return error(res, 'No autenticado', 401);
 
     // El admin siempre tiene acceso total
-    if (req.user.rol === 'admin') return next();
+    if (req.user.rol === 'admin' || req.user.role === 'admin') return next();
 
     const permisos = req.user.permisos || {};
     const moduloPermisos = permisos[modulo] || {};

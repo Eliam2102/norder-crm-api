@@ -148,10 +148,15 @@ export const create = async (req, res, next) => {
                     create: {
                         objetivo: e.objetivo ?? req.body.objetivo,
                         gymOrigen: e.gymOrigen ?? req.body.gymOrigen,
+                        horaEntrenamiento: e.horaEntrenamiento ?? req.body.horaEntrenamiento,
                         disciplina: e.disciplina ?? req.body.disciplina,
                         frecuencia: e.frecuencia ?? req.body.frecuencia,
                         tiempo: e.tiempo ?? req.body.tiempo,
-                        nivelActividad: e.nivelActividad ?? req.body.nivelActividad
+                        nivelActividad: e.nivelActividad ?? req.body.nivelActividad,
+                        porcentajeSedentario: e.porcentajeSedentario ?? req.body.porcentajeSedentario,
+                        porcentajeLeve: e.porcentajeLeve ?? req.body.porcentajeLeve,
+                        porcentajeModerado: e.porcentajeModerado ?? req.body.porcentajeModerado,
+                        porcentajeIntenso: e.porcentajeIntenso ?? req.body.porcentajeIntenso
                     }
                 },
                 antecedentes: {
@@ -161,6 +166,7 @@ export const create = async (req, res, next) => {
                         alergias: a.alergias ?? a.alergico ?? req.body.alergias ?? req.body.alergico,
                         patologia: a.patologia ?? req.body.patologia,
                         cirugias: a.cirugias ?? req.body.cirugias,
+                        farmacos: a.farmacos ?? req.body.farmacos,
                         estrenimiento: a.estrenimiento ?? h.estrenimiento ?? req.body.estrenimiento,
                         consumoAlcohol: a.consumoAlcohol ?? a.alcohol ?? h.consumoAlcohol ?? h.alcohol ?? req.body.consumoAlcohol ?? req.body.alcohol,
                         tabaco: a.tabaco ?? h.tabaco ?? req.body.tabaco,
@@ -411,6 +417,7 @@ export const update = async (req, res, next) => {
                         update: {
                             objetivo: e.objetivo,
                             gymOrigen: e.gymOrigen,
+                            horaEntrenamiento: e.horaEntrenamiento ?? undefined,
                             disciplina: e.disciplina,
                             frecuencia: e.frecuencia,
                             tiempo: e.tiempo,
@@ -423,6 +430,7 @@ export const update = async (req, res, next) => {
                         create: {
                             objetivo: e.objetivo,
                             gymOrigen: e.gymOrigen,
+                            horaEntrenamiento: e.horaEntrenamiento ?? undefined,
                             disciplina: e.disciplina,
                             frecuencia: e.frecuencia,
                             tiempo: e.tiempo,
