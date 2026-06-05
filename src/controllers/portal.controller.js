@@ -64,6 +64,57 @@ export const loginPortal = async (req, res) => {
     }
 };
 
+// ─── Plan ─────────────────────────────────────────────────────────────────────
+
+export const getPlan = async (req, res) => {
+    try {
+        const plan = await prisma.plan.findFirst({
+            where: { pacienteId: req.paciente.id, estado: 'activo' },
+            orderBy: { fechaCreacion: 'desc' },
+            include: {
+                menus: {
+                    orderBy: { orden: 'asc' },
+                    include: {
+                        tiemposComida: {
+                            orderBy: { orden: 'asc' },
+                            select: { nombre: true, notaPie: true, bebida: true, orden: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!plan) return res.json({ plan: null });
+
+        return res.json({
+            plan: {
+                nombre: plan.nombre,
+                calorias: plan.calorias,
+                tipoPlan: plan.tipoPlan,
+                proteinasPct: plan.proteinasPct,
+                carbohidratosPct: plan.carbohidratosPct,
+                grasasPct: plan.grasasPct,
+                proteinasGr: plan.proteinasGr,
+                carbohidratosGr: plan.carbohidratosGr,
+                grasasGr: plan.grasasGr,
+                notasGenerales: plan.notasGenerales,
+                proximaSesion: plan.proximaSesion,
+                menus: plan.menus.map(m => ({
+                    nombre: m.nombre,
+                    tiempos: m.tiemposComida.map(t => ({
+                        nombre: t.nombre,
+                        nota: t.notaPie || null,
+                        bebida: t.bebida || null,
+                    }))
+                }))
+            }
+        });
+    } catch (err) {
+        console.error('[Portal] getPlan error:', err);
+        return res.status(500).json({ error: 'Error al obtener el plan.' });
+    }
+};
+
 // ─── Me ───────────────────────────────────────────────────────────────────────
 
 export const getMe = async (req, res) => {
@@ -93,10 +144,10 @@ export const getMe = async (req, res) => {
 
 export const chat = async (req, res) => {
     try {
-        const { mensaje } = req.body;
+        const { mensaje, imagen_base64 } = req.body;
 
-        if (!mensaje?.trim()) {
-            return res.status(400).json({ error: 'El mensaje no puede estar vacío.' });
+        if (!mensaje?.trim() && !imagen_base64) {
+            return res.status(400).json({ error: 'Envía un mensaje o una imagen.' });
         }
 
         // Validar membresía usando helper compartido
@@ -113,14 +164,15 @@ export const chat = async (req, res) => {
         }
 
         const { default: axios } = await import('axios');
-        const n8nResponse = await axios.post(
-            webhookUrl,
-            {
-                mensaje: mensaje.trim(),
-                Numero_Telefono: contexto.telefono,
-            },
-            { timeout: 35_000 }
-        );
+        const payload = {
+            mensaje: mensaje?.trim() || '',
+            Numero_Telefono: contexto.telefono,
+        };
+        if (req.body.imagen_base64) {
+            payload.imagen_base64 = req.body.imagen_base64;
+        }
+
+        const n8nResponse = await axios.post(webhookUrl, payload, { timeout: 60_000 });
 
         const respuesta =
             n8nResponse.data?.output ||
