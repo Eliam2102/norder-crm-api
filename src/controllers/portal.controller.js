@@ -69,7 +69,13 @@ export const loginPortal = async (req, res) => {
 export const getPlan = async (req, res) => {
     try {
         const plan = await prisma.plan.findFirst({
-            where: { pacienteId: req.paciente.id, estado: 'activo' },
+            where: {
+                estado: 'activo',
+                OR: [
+                    { pacienteId: req.paciente.id },
+                    { valoracion: { pacienteId: req.paciente.id } },
+                ],
+            },
             orderBy: { fechaCreacion: 'desc' },
             include: {
                 menus: {
