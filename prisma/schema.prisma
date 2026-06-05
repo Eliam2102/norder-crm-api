@@ -23,6 +23,7 @@ model Paciente {
   suscripcionIdExterno String?   @map("suscripcion_id_externo")
   suscripcionInicio    DateTime? @map("suscripcion_inicio") @db.Date
   suscripcionFin       DateTime? @map("suscripcion_fin") @db.Date
+  portalActivo         Boolean   @default(false) @map("portal_activo")
 
   @@index([nivelMembresia])
   @@index([fechaRegistro])
