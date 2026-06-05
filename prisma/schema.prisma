@@ -38,6 +38,7 @@ model Paciente {
   requerimientos   Requerimiento[]
   barridos         BarridoEquivalencias[]
   citas            Cita[]
+  mensajesPortal   MensajePortal[]
 
   @@map("paciente")
 }
@@ -559,6 +560,20 @@ model Platillo {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("platillo")
+}
+
+model MensajePortal {
+  id           String   @id @default(uuid())
+  pacienteId   String   @map("paciente_id")
+  rol          String   // 'user' | 'eyder'
+  contenido    String
+  tieneImagen  Boolean  @default(false) @map("tiene_imagen")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([pacienteId, createdAt])
+  @@map("mensaje_portal")
 }
 
 model Cita {

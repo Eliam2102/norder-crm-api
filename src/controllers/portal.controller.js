@@ -147,6 +147,23 @@ export const getMe = async (req, res) => {
     }
 };
 
+// ─── Mensajes (historial) ─────────────────────────────────────────────────────
+
+export const getMensajes = async (req, res) => {
+    try {
+        const mensajes = await prisma.mensajePortal.findMany({
+            where: { pacienteId: req.paciente.id },
+            orderBy: { createdAt: 'asc' },
+            take: 100,
+            select: { id: true, rol: true, contenido: true, tieneImagen: true, createdAt: true },
+        });
+        return res.json({ mensajes });
+    } catch (err) {
+        console.error('[Portal] getMensajes error:', err);
+        return res.status(500).json({ error: 'Error al obtener historial.' });
+    }
+};
+
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 export const chat = async (req, res) => {
@@ -157,7 +174,6 @@ export const chat = async (req, res) => {
             return res.status(400).json({ error: 'Envía un mensaje o una imagen.' });
         }
 
-        // Validar membresía usando helper compartido
         const contexto = await getContextoPaciente({ pacienteId: req.paciente.id });
 
         if (!contexto.acceso) {
@@ -170,13 +186,23 @@ export const chat = async (req, res) => {
             return res.status(503).json({ error: 'Servicio de chat no disponible temporalmente.' });
         }
 
+        // Guardar mensaje del usuario
+        await prisma.mensajePortal.create({
+            data: {
+                pacienteId: req.paciente.id,
+                rol: 'user',
+                contenido: mensaje?.trim() || '',
+                tieneImagen: !!imagen_base64,
+            },
+        });
+
         const { default: axios } = await import('axios');
         const payload = {
             mensaje: mensaje?.trim() || '',
             Numero_Telefono: contexto.telefono,
         };
-        if (req.body.imagen_base64) {
-            payload.imagen_base64 = req.body.imagen_base64;
+        if (imagen_base64) {
+            payload.imagen_base64 = imagen_base64;
         }
 
         const n8nResponse = await axios.post(webhookUrl, payload, { timeout: 60_000 });
@@ -187,6 +213,16 @@ export const chat = async (req, res) => {
             n8nResponse.data?.text ||
             (typeof n8nResponse.data === 'string' ? n8nResponse.data : null) ||
             'Sin respuesta del agente.';
+
+        // Guardar respuesta de Eyder
+        await prisma.mensajePortal.create({
+            data: {
+                pacienteId: req.paciente.id,
+                rol: 'eyder',
+                contenido: respuesta,
+                tieneImagen: false,
+            },
+        });
 
         return res.json({ respuesta });
     } catch (err) {
