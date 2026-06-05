@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import errorHandler from './middlewares/errorHandler.js';
 
 // BigInt serialization fix for JSON
-BigInt.prototype.toJSON = function() {
+BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
@@ -22,8 +22,13 @@ import alimentosSMAERoutes from './routes/alimentosSmae.routes.js';
 import platillosRoutes from './routes/platillos.routes.js';
 import citasRoutes from './routes/citas.routes.js';
 import agentRoutes from './routes/agent.routes.js';
+import webhooksRoutes from './routes/webhooks.routes.js';
+import portalRoutes from './routes/portal.routes.js';
 
 const app = express();
+
+// Stripe webhook — raw body BEFORE express.json()
+app.use('/api/webhooks', webhooksRoutes);
 
 // Security Middlewares
 // crossOriginResourcePolicy se desactiva para permitir requests desde Vercel/otros orígenes
@@ -100,6 +105,9 @@ app.use('/api/citas', authMiddleware, citasRoutes);
 
 // Agente nutriólogo — sin JWT (protegido por X-Agent-Key opcional)
 app.use('/api/agent', agentRoutes);
+
+// Portal Norder Health — autenticación por paciente (JWT tipo 'portal')
+app.use('/api/portal', portalRoutes);
 
 // Opcionales o específicos
 app.use('/api/configuracion', authMiddleware, configuracionRoutes);
