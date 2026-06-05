@@ -68,13 +68,12 @@ export const loginPortal = async (req, res) => {
 
 export const getPlan = async (req, res) => {
     try {
+        console.log('[Portal] getPlan para pacienteId:', req.paciente.id);
+
         const plan = await prisma.plan.findFirst({
             where: {
+                pacienteId: req.paciente.id,
                 estado: 'activo',
-                OR: [
-                    { pacienteId: req.paciente.id },
-                    { valoracion: { pacienteId: req.paciente.id } },
-                ],
             },
             orderBy: { fechaCreacion: 'desc' },
             include: {
@@ -89,6 +88,8 @@ export const getPlan = async (req, res) => {
                 }
             }
         });
+
+        console.log('[Portal] Plan encontrado:', plan ? plan.nombre : 'NINGUNO');
 
         if (!plan) return res.json({ plan: null });
 
