@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { loginPortal, getMe, getPlan, chat, activarPortalManual } from '../controllers/portal.controller.js';
 import { portalAuthMiddleware } from '../middlewares/portalAuth.middleware.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
@@ -10,7 +10,7 @@ const router = Router();
 const chatLimiter = rateLimit({
     windowMs: 60 * 1000,
     max: 5,
-    keyGenerator: (req) => req.paciente?.id || req.ip,
+    keyGenerator: (req) => req.paciente?.id || ipKeyGenerator(req),
     handler: (req, res) => res.status(429).json({ error: 'Demasiados mensajes. Espera un momento.' }),
     standardHeaders: true,
     legacyHeaders: false,
