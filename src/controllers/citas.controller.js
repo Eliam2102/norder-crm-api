@@ -2,7 +2,8 @@ import 'dotenv/config';
 import prisma from '../lib/prisma.js';
 import axios from 'axios';
 
-const CALCOM_API_URL = 'https://api.cal.com/v1';
+const CALCOM_API_URL = 'https://api.cal.com/v2';
+const CALCOM_API_VERSION = '2024-08-13';
 
 export const getSlots = async (req, res) => {
   try {
@@ -12,42 +13,43 @@ export const getSlots = async (req, res) => {
       return res.status(400).json({ error: 'Faltan parámetros requeridos (eventTypeId, startTime, endTime)' });
     }
 
-    const response = await axios.get(`${CALCOM_API_URL}/slots`, {
+    const response = await axios.get(`${CALCOM_API_URL}/slots/available`, {
       params: {
         eventTypeId,
-        startTime,
-        endTime,
+        startTime: startTime,
+        endTime: endTime,
         timeZone: 'America/Merida',
-        apiKey: process.env.CALCOM_API_KEY,
       },
       headers: {
         Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
+        'cal-api-version': CALCOM_API_VERSION,
       },
     });
 
-    res.json(response.data);
+    // En API v2 las respuestas vienen envueltas en { status: 'success', data: ... }
+    const responseData = response.data?.data || response.data;
+    res.json(responseData);
   } catch (error) {
     console.error('Error al obtener slots de Cal.com:', error.response?.data || error.message);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al consultar disponibilidad en Cal.com',
-      details: error.response?.data || error.message 
+      details: error.response?.data || error.message
     });
   }
 };
 
 export const agendarCita = async (req, res) => {
   try {
-    const { pacienteId, fecha, modalidad, eventTypeId, name, email, phone } = req.body;
+    const { pacienteId, valoracionId, fecha, modalidad, eventTypeId, name, email, phone } = req.body;
+
+    console.log('[agendarCita] Body recibido:', JSON.stringify({ pacienteId, valoracionId, fecha, modalidad, eventTypeId, name, email, phone }));
 
     if (!pacienteId || !fecha || !modalidad || !eventTypeId) {
       return res.status(400).json({ error: 'Faltan datos para agendar la cita' });
     }
 
-    // 1. Obtener datos del paciente (por si acaso no vienen del front)
-    const paciente = await prisma.paciente.findUnique({
-      where: { id: pacienteId }
-    });
-
+    // 1. Obtener datos del paciente
+    const paciente = await prisma.paciente.findUnique({ where: { id: pacienteId } });
     if (!paciente) {
       return res.status(404).json({ error: 'Paciente no encontrado' });
     }
@@ -60,37 +62,56 @@ export const agendarCita = async (req, res) => {
       return p;
     };
 
-    // 2. Crear reserva en Cal.com
-    const bookingResponse = await axios.post(`${CALCOM_API_URL}/bookings`, {
+    const phoneClean = cleanPhone(phone || paciente.telefono) || '+520000000000';
+    const nameClean = name || `${paciente.nombre} ${paciente.apellido || ''}`.trim();
+    const emailClean = email || paciente.email || 'noreply@norder.mx';
+
+    // Formato de payload V2 de Cal.com
+    const bookingPayload = {
       eventTypeId: Number(eventTypeId),
       start: fecha,
-      responses: {
-        name: name || `${paciente.nombre} ${paciente.apellido || ''}`.trim(),
-        email: email || paciente.email || 'noreply@norder.mx',
-        attendeePhoneNumber: cleanPhone(phone || paciente.telefono),
+      attendee: {
+        name: nameClean,
+        email: emailClean,
+        phoneNumber: phoneClean,
+        timeZone: 'America/Merida',
+        language: 'es'
       },
-      // location REMOVED as it conflicts with 'responses' in some event type configs
-      timeZone: 'America/Merida',
-      language: 'es',
       metadata: {
-        pacienteId: paciente.id
+        pacienteId: paciente.id,
+        ...(valoracionId && { valoracionId })
       }
-    }, {
-      params: {
-        apiKey: process.env.CALCOM_API_KEY
-      },
-      headers: {
-        Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    };
 
-    const bookingData = bookingResponse.data?.booking || bookingResponse.data;
+    console.log('[agendarCita] Payload a Cal.com (v2):', JSON.stringify(bookingPayload));
 
-    // 3. Guardar en la BD local
+    // 2. Crear reserva en Cal.com
+    let bookingData;
+    try {
+      const bookingResponse = await axios.post(`${CALCOM_API_URL}/bookings`, bookingPayload, {
+        headers: {
+          Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
+          'cal-api-version': CALCOM_API_VERSION,
+          'Content-Type': 'application/json'
+        }
+      });
+      // V2 wrap: { status: 'success', data: { id: ... } }
+      bookingData = bookingResponse.data?.data || bookingResponse.data?.booking || bookingResponse.data;
+      console.log('[agendarCita] Cal.com respondió OK. bookingId:', bookingData?.id);
+    } catch (calcomErr) {
+      const calcomError = calcomErr.response?.data || calcomErr.message;
+      console.error('[agendarCita] ERROR de Cal.com:', JSON.stringify(calcomError));
+      return res.status(500).json({
+        error: 'Cal.com rechazó la solicitud de reserva',
+        details: calcomError
+      });
+    }
+
+    // 3. Guardar en BD local
     const cita = await prisma.cita.create({
       data: {
         pacienteId,
+        ...(valoracionId && { valoracionId }),
         fecha: new Date(fecha),
         modalidad,
         calcomBookingId: String(bookingData.id),
@@ -98,12 +119,14 @@ export const agendarCita = async (req, res) => {
       }
     });
 
+    console.log('[agendarCita] Cita guardada en BD:', cita.id);
     res.json({ ok: true, cita, calcom: bookingData });
+
   } catch (error) {
-    console.error('Error al agendar en Cal.com:', error.response?.data || error.message);
-    res.status(500).json({ 
-      error: 'Error al procesar el agendamiento',
-      details: error.response?.data || error.message 
+    console.error('[agendarCita] Error inesperado:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Error inesperado al procesar el agendamiento',
+      details: error.message
     });
   }
 };
@@ -112,20 +135,19 @@ export const getEventType = async (req, res) => {
   try {
     const { id } = req.params;
     const response = await axios.get(`${CALCOM_API_URL}/event-types/${id}`, {
-      params: {
-        apiKey: process.env.CALCOM_API_KEY,
-      },
       headers: {
         Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
+        'cal-api-version': CALCOM_API_VERSION,
       },
     });
 
-    res.json(response.data);
+    const responseData = response.data?.data || response.data;
+    res.json(responseData);
   } catch (err) {
     console.error('Error al obtener tipo de evento en Cal.com:', err.response?.data || err.message);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Error al obtener configuración del evento en Cal.com',
-      details: err.response?.data || err.message 
+      details: err.response?.data || err.message
     });
   }
 };

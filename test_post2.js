@@ -1,0 +1,23 @@
+import axios from 'axios';
+
+async function run() {
+  try {
+     const res = await axios.post('http://localhost:3000/api/citas/agendar', {
+        pacienteId: 'b6cbf1ee-b8cf-4fe8-bad7-30e4ab50f68d', // any fake for testing
+        name: 'Eyder Test',
+        email: 'eyder@norder.mx',
+        eventTypeId: 4418629,
+        fecha: '2026-04-10T10:00:00.000Z',
+        modalidad: 'presencial'
+     }, {
+       headers: {
+         Authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InN1cGVyLWFkbWluIiwiZW1haWwiOiJleWRlckBub3JkZXIubXgiLCJub21icmUiOiJFeWRlciBNw6luZGV6Iiwicm9sIjoiYWRtaW4iLCJwZXJtaXNvcyI6eyJkYXNoYm9hcmQiOnsicmVhZCI6dHJ1ZSwid3JpdGUiOnRydWUsImRlbGV0ZSI6dHJ1ZX0sInBhY2llbnRlcyI6eyJyZWFkIjp0cnVlLCJ3cml0ZSI6dHJ1ZSwiZGVsZXRlIjp0cnVlfSwicGxhbmVzIjp7InJlYWQiOnRydWUsIndyaXRlIjp0cnVlLCJkZWxldGUiOnRydWV9LCJzbWFlIjp7InJlYWQiOnRydWUsIndyaXRlIjp0cnVlLCJkZWxldGUiOnRydWV9LCJhZG1pbiI6eyJyZWFkIjp0cnVlLCJ3cml0ZSI6dHJ1ZSwiZGVsZXRlIjp0cnVlfX0sImlzU3VwZXJBZG1pbiI6dHJ1ZSwiaWF0IjoxNzc0ODM3NDY4LCJleHAiOjE3NzU0NDIyNjh9.OzspnDfC-f4Mkm-9NgmaoGj7TP7Er67rGray2kymmhQ'
+       }
+     });
+     console.log("Success:", res.data);
+  } catch(e) {
+     console.log("Error status:", e.response?.status);
+     console.log("Error data:", JSON.stringify(e.response?.data, null, 2));
+  }
+}
+run();

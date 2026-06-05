@@ -156,8 +156,8 @@
         .menu-col:last-child { border-right: none; }
         .menu-time { font-weight: bold; text-transform: uppercase; margin-bottom: 4px; font-size: 10px; }
         .menu-time-subtitle { font-weight: normal; text-transform: none; font-size: 8px; display: block; margin-top: 1px; }
-        .menu-item { margin-bottom: 3px; padding-left: 8px; position: relative; font-size: 8.5px; }
-        .menu-item:before { content: "-"; position: absolute; left: 0; }
+        .menu-item { margin-bottom: 2px; padding-left: 10px; font-size: 8.5px; line-height: 1.35; }
+        .menu-sub  { display: block; padding-left: 14px; font-size: 7.8px; color: #555; line-height: 1.3; }
         .menu-water { margin-top: 8px; font-size: 9px; }
         .menu-bebida { margin-top: 4px; font-size: 9px; color: #000; }
         .menu-supl { margin-top: 3px; font-size: 9px; color: #000; }
@@ -209,10 +209,11 @@
             </div>
             <div class="header-info">
                 <strong>L.N. Eyder Méndez Gamboa</strong><br>
-                Certificación ISAK Nivel 2<br><br>
-                +52 999 127 61 29 / consultas@norder.mx<br>
+                Certificación ISAK Nivel 2<br>
+                Cédula: 11181890<br>
+                999 453 7182 / nordermx@gmail.com<br>
                 <strong>VIA "Vida Integral y Asesoría Profesional"</strong><br>
-                999 292 1130 / Calle 40 #278 G, Campestre C.P. 97120. Mérida, Yucatán.
+                Calle 40 #278 G, Campestre C.P. 97120. Mérida, Yucatán.
             </div>
         </div>
     `;
@@ -295,7 +296,7 @@
             </ul>
 
             <!-- Observaciones / Notas Generales -->
-            <div class="font-bold" style="margin-bottom: 4px;">Observaciones:</div>
+            <div class="font-bold" style="margin-bottom: 4px;">Notas en consulta:</div>
             <ul class="bullet-list" style="list-style-type: none;">
                 <% 
                    const notasArray = (plan.notasGenerales || "").split(/\r?\n/).filter(n => n.trim() !== '');
@@ -315,9 +316,23 @@
                 <div style="text-align:center; margin: 20px 0;"><span class="highlight-yellow"><%= meta.notaAmarilla %></span></div>
             <% } %>
 
-            <table>
-                <tr><td class="font-bold">Correo:</td><td><%= meta.correoConsulta || paciente.email || '-' %></td></tr>
+<% if (meta.showContacto !== false) { %>
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 0;">
+                <tr>
+                    <td style="width:50%; padding: 2px 8px; border-right: none; vertical-align: middle;">
+                        <span style="font-weight:700; font-size:8.5px;">Correo: </span>
+                        <span style="font-size:8.5px;"><%= meta.correoConsulta || paciente.email || '-' %></span>
+                    </td>
+                    <td style="width:50%; padding: 2px 8px; border-left: 1px solid #000; vertical-align: middle;">
+                        <span style="font-weight:700; font-size:8.5px;">Tel: </span>
+                        <span style="font-size:8.5px;"><%
+                            const rawTel = (paciente.telefono || '').replace(/\D/g, '');
+                            const tel10 = rawTel.length > 10 ? rawTel.slice(-10) : (rawTel || '-');
+                        %><%= tel10 %></span>
+                    </td>
+                </tr>
             </table>
+<% } %>
         </div>
 
         <!-- Columna derecha: Guía Tipos de Cuerpo HTML nativo -->
@@ -366,31 +381,69 @@
                         grouped1[plat].push(ing);
                     });
                     
-                    Object.keys(grouped1).forEach(plat => {
-                        if (plat && !meta.soloEquivalencias) { %>
-                            <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
-                        <% }
-                        grouped1[plat].forEach(ing => {
-                        %>
-                        <div class="menu-item">
-                            <% if (meta.soloEquivalencias) { %>
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
-                                <% } %>
-                            <% } else { %>
-                                <% const cantNum1 = parseFloat(ing.cantidad) || 0; %>
-                                <% if (cantNum1 > 0) { %>
-                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
-                                    <% } %>
+                    if (meta.soloEquivalencias) {
+                        const allEqs = [];
+                        const allLibres = [];
+                        Object.values(grouped1).flat().forEach(ing => {
+                            const eqsM1Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                            
+                            // Filtramos las que son "libre" para no mostrarlas como equivalencia numérica
+                            const eqsM1 = eqsM1Raw.filter(e => parseFloat(e.cantidad) > 0 && !String(e.grupo).toLowerCase().includes('libre'));
+                            const hasLibre = eqsM1Raw.some(e => String(e.grupo).toLowerCase().includes('libre'));
+
+                            if (eqsM1.length > 0) {
+                                allEqs.push(eqsM1.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + '));
+                            }
+                            // Si el ingrediente fue marcado como libre o no generó ninguna equivalencia real
+                            if (hasLibre || (eqsM1.length === 0 && ing.descripcion)) {
+                                allLibres.push(ing);
+                            }
+                        });
+                        
+                        allEqs.forEach(eq => { %>
+                            <div class="menu-item"><%= eq %></div>
+                        <% }); 
+                        
+                        if (allLibres.length > 0) { %>
+                            <% if (allEqs.length > 0) { %><div style="height: 2px;"></div><% } %>
+                            <% allLibres.forEach(ing => { 
+                                const cantNumL = parseFloat(ing.cantidad) || 0;
+                                const unidadL  = (ing.unidad || '').trim();
+                            %>
+                                <div class="menu-item" style="color:#555;">
+                                    <%= ing.descripcion %><% if (cantNumL > 0 && unidadL !== '-') { %> <span style="font-size:7.5px;">(<%= ing.cantidad %> <%= unidadL %>)</span><% } %>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    <% } else {
+                        Object.keys(grouped1).forEach(plat => {
+                            if (plat) { %>
+                                <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                            <% }
+                            grouped1[plat].forEach(ing => {
+                            %>
+                            <div class="menu-item">
+                                <% 
+                                const eqsM1Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                    ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                    : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                                const eqsM1 = eqsM1Raw.filter(e => parseFloat(e.cantidad) > 0);
+                                const eqStrM1 = eqsM1.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + ');
+                                const cantNum1 = parseFloat(ing.cantidad) || 0;
+                                const unidadM1 = (ing.unidad || '').trim();
+                                %>
+                                <% if (cantNum1 > 0 && unidadM1 !== '-') { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= unidadM1 %>
+                                    <% if(eqStrM1) { %> (<%= eqStrM1 %>)<% } %>
                                 <% } else if (ing.descripcion) { %>
-                                    <%= ing.descripcion %>
+                                    <%= ing.descripcion %><% if(eqStrM1) { %> (<%= eqStrM1 %>)<% } %>
                                 <% } %>
-                            <% } %>
-                        </div>
-                    <%  });
-                    }); %>
+                            </div>
+                        <%  });
+                        });
+                    } %>
                 <% } %>
                 
                 <% if(tMenu1 && tMenu1.notaPie) { %>
@@ -419,31 +472,68 @@
                         grouped2[plat].push(ing);
                     });
                     
-                    Object.keys(grouped2).forEach(plat => {
-                        if (plat && !meta.soloEquivalencias) { %>
-                            <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
-                        <% }
-                        grouped2[plat].forEach(ing => {
-                        %>
-                        <div class="menu-item">
-                            <% if (meta.soloEquivalencias) { %>
-                                <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                    • <%= ing.eqCantidad %> eq <%= ing.eqGrupo %>
-                                <% } %>
-                            <% } else { %>
-                                <% const cantNum2 = parseFloat(ing.cantidad) || 0; %>
-                                <% if (cantNum2 > 0) { %>
-                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= ing.unidad %> 
-                                    <% if(ing.eqCantidad && ing.eqGrupo) { %>
-                                        (<%= ing.eqCantidad %> eq <%= ing.eqGrupo %>)
-                                    <% } %>
+                    if (meta.soloEquivalencias) {
+                        const allEqs = [];
+                        const allLibres = [];
+                        Object.values(grouped2).flat().forEach(ing => {
+                            const eqsM2Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                            
+                            const eqsM2 = eqsM2Raw.filter(e => parseFloat(e.cantidad) > 0 && !String(e.grupo).toLowerCase().includes('libre'));
+                            const hasLibre = eqsM2Raw.some(e => String(e.grupo).toLowerCase().includes('libre'));
+
+                            if (eqsM2.length > 0) {
+                                allEqs.push(eqsM2.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + '));
+                            }
+                            
+                            if (hasLibre || (eqsM2.length === 0 && ing.descripcion)) {
+                                allLibres.push(ing);
+                            }
+                        });
+                        
+                        allEqs.forEach(eq => { %>
+                            <div class="menu-item"><%= eq %></div>
+                        <% }); 
+                        
+                        if (allLibres.length > 0) { %>
+                            <% if (allEqs.length > 0) { %><div style="margin: 4px 0 2px 0; border-top: 1px dashed #999; width: 60%;"></div><% } %>
+                            <% allLibres.forEach(ing => { 
+                                const cantNumL = parseFloat(ing.cantidad) || 0;
+                                const unidadL  = (ing.unidad || '').trim();
+                            %>
+                                <div class="menu-item" style="color:#555;">
+                                    <%= ing.descripcion %><% if (cantNumL > 0 && unidadL !== '-') { %> <span style="font-size:7.5px;">(<%= ing.cantidad %> <%= unidadL %>)</span><% } %>
+                                </div>
+                            <% }); %>
+                        <% } %>
+                    <% } else {
+                        Object.keys(grouped2).forEach(plat => {
+                            if (plat) { %>
+                                <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                            <% }
+                            grouped2[plat].forEach(ing => {
+                            %>
+                            <div class="menu-item">
+                                <% 
+                                const eqsM2Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
+                                    ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
+                                    : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                                const eqsM2 = eqsM2Raw.filter(e => parseFloat(e.cantidad) > 0);
+                                const eqStrM2 = eqsM2.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + ');
+                                const cantNum2 = parseFloat(ing.cantidad) || 0;
+                                const unidadM2 = (ing.unidad || '').trim();
+                                %>
+                                <% if (cantNum2 > 0 && unidadM2 !== '-') { %>
+                                    <%= ing.descripcion %> - <%= ing.cantidad %> <%= unidadM2 %>
+                                    <% if(eqStrM2) { %> (<%= eqStrM2 %>)<% } %>
                                 <% } else if (ing.descripcion) { %>
-                                    <%= ing.descripcion %>
+                                    <%= ing.descripcion %><% if(eqStrM2) { %> (<%= eqStrM2 %>)<% } %>
                                 <% } %>
-                            <% } %>
-                        </div>
-                    <%  });
-                    }); %>
+                            </div>
+                        <%  });
+                        });
+                    } %>
                 <% } %>
 
                 <% if(tMenu2 && tMenu2.notaPie) { %>
@@ -477,62 +567,87 @@
         .ic-tbl {
             width: 100%;
             border-collapse: collapse;
-            font-size: 7.5px;
+            font-size: 7px;
             table-layout: fixed;
             page-break-inside: avoid;
-            margin-bottom: 4px;
+            margin-bottom: 3px;
         }
         .ic-tbl td, .ic-tbl th {
-            border: 1px solid #000;
-            padding: 1px 2.5px;
+            border: 1px solid #ddd;
+            padding: 1px 3px;
             vertical-align: middle;
             overflow: hidden;
+            line-height: 1.25;
         }
         .ic-tbl .ic-title {
             font-weight: bold;
             text-align: center;
-            font-size: 11px;
-            padding: 2px;
+            font-size: 10px;
+            padding: 4px 2px;
+            background-color: #f2f2f2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            border-bottom: 1px solid #ccc;
         }
-        /* Cabeceras de columna "Grupo / Porción(1)" */
         .ic-tbl .ic-col-hdr {
-            font-weight: 800;
-            font-size: 8px;
+            font-weight: 700;
+            font-size: 7.5px;
             color: #444;
             text-transform: uppercase;
-            background: #f0f0f0;
-            padding: 2px;
+            background-color: #f2f2f2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            padding: 2px 3px;
+            border: 1px solid #ddd;
         }
-        /* Nombre del grupo (Verduras, Frutas...) */
+        /* Header de categoría (Verduras, Frutas, AOA...) */
         .ic-tbl .ic-grp {
-            font-weight: 800;
-            font-size: 8.5px;
-            color: #000;
-            background: #e9eff5;
+            font-weight: 700;
+            font-size: 7.5px;
+            color: #222;
+            background-color: #d9d9d9 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
             text-transform: uppercase;
-            padding: 2.5px 2px;
+            padding: 2px 3px;
+            border: 1px solid #ddd;
         }
         /* Celda de nombre de alimento */
         .ic-tbl .ic-nm  { 
-            font-weight: 600; 
-            color: #222;
+            font-weight: 500;
+            color: #111;
+            padding-left: 4px;
+            border: 1px solid #ddd;
         }
         /* Celda de porción */
         .ic-tbl .ic-qty { 
-            font-weight: 500;
-            color: #3b5973; 
+            font-weight: 400;
+            color: #444;
+            font-size: 6.8px;
+            border: 1px solid #ddd;
         }
         /* Sección abreviaciones */
         .ic-abbr {
             width: 100%;
             border-collapse: collapse;
-            font-size: 7.5px;
+            font-size: 7px;
             table-layout: fixed;
             margin-top: 3px;
             page-break-inside: avoid;
         }
-        .ic-abbr td { border: 1px solid #000; padding: 1.5px 3px; vertical-align: top; }
-        .ic-abbr .abbr-hdr { font-weight: bold; background: #f0f0f0; font-size: 8px; padding: 2px; }
+        .ic-abbr td { border: 1px solid #ddd; padding: 1.5px 3px; vertical-align: top; }
+        .ic-abbr .abbr-hdr {
+            font-weight: bold;
+            background-color: #f2f2f2 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            font-size: 7.5px;
+            padding: 2px 3px;
+            text-align: center;
+            text-transform: uppercase;
+            color: #444;
+            border: 1px solid #ddd;
+        }
     </style>
 
     <!-- ═══ Tabla principal ═══════════════════════════════════════════════════ -->
@@ -650,7 +765,7 @@
 
     <!-- ═══ Abreviaciones ═══════════════════════════════════════════════════ -->
     <table class="ic-abbr">
-        <tr><td colspan="3" class="abbr-hdr">Abreviaciones</td></tr>
+        <tr><td colspan="3" class="ic-title">Abreviaciones</td></tr>
         <tr>
             <td><strong>IMC:</strong> índice de masa corporal<br><strong>MLG:</strong> masa libre de grasa</td>
             <td><strong>Eq:</strong> equivalentes<br><strong>AOA:</strong> alimentos de origen animal<br><strong>Cdita:</strong> cucharadita &nbsp; <strong>Cda:</strong> cucharada</td>

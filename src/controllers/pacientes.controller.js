@@ -26,7 +26,8 @@ export const getAll = async (req, res, next) => {
                         { numeroValoracion: 'desc' }
                     ],
                     include: {
-                        barrido: { select: { id: true, kcalTotal: true, porciones: true } }
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true } },
+                        citas: { select: { id: true, fecha: true } }
                     }
                 },
                 planes: {
@@ -67,7 +68,10 @@ export const getAll = async (req, res, next) => {
                     hasBarrido,
                     estadoFlujo,
                     planId: planAsociado?.id || null,
-                    estadoEnvio: planAsociado?.estadoEnvio || null
+                    estadoEnvio: planAsociado?.estadoEnvio || null,
+                    // true si existe al menos una cita de seguimiento para esta valoración
+                    tieneCita: Array.isArray(v.citas) && v.citas.length > 0,
+                    proximaCita: Array.isArray(v.citas) && v.citas.length > 0 ? v.citas[0].fecha : null,
                 };
             });
 
@@ -105,6 +109,31 @@ export const create = async (req, res, next) => {
         const s = suplementacion || {};
         const c24 = consumo24h || h; 
 
+        if (telefono) {
+            // Extracción de los últimos 10 dígitos netos para coincidencia a prueba de balas
+            const telLimpo = telefono.replace(/\D/g, '');
+            if (telLimpo.length >= 10) {
+                const targetTel = telLimpo.slice(-10);
+                const existsPhone = await prisma.paciente.findFirst({
+                    where: { telefono: { endsWith: targetTel } },
+                    select: { id: true }
+                });
+                if (existsPhone) {
+                    return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Corrige el teléfono.' });
+                }
+            } else {
+                const exists = await prisma.paciente.findFirst({ where: { telefono } });
+                if (exists) return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente.' });
+            }
+        }
+        
+        if (email) {
+            const existsEmail = await prisma.paciente.findFirst({ where: { email: email.trim() } });
+            if (existsEmail) {
+                return res.status(409).json({ success: false, error: 'Este correo electrónico (email) ya está registrado en otro expediente.' });
+            }
+        }
+
         const nuevo = await prisma.paciente.create({
             data: {
                 nombre,
@@ -121,10 +150,15 @@ export const create = async (req, res, next) => {
                     create: {
                         objetivo: e.objetivo ?? req.body.objetivo,
                         gymOrigen: e.gymOrigen ?? req.body.gymOrigen,
+                        horaEntrenamiento: e.horaEntrenamiento ?? req.body.horaEntrenamiento,
                         disciplina: e.disciplina ?? req.body.disciplina,
                         frecuencia: e.frecuencia ?? req.body.frecuencia,
                         tiempo: e.tiempo ?? req.body.tiempo,
-                        nivelActividad: e.nivelActividad ?? req.body.nivelActividad
+                        nivelActividad: e.nivelActividad ?? req.body.nivelActividad,
+                        porcentajeSedentario: e.porcentajeSedentario ?? req.body.porcentajeSedentario,
+                        porcentajeLeve: e.porcentajeLeve ?? req.body.porcentajeLeve,
+                        porcentajeModerado: e.porcentajeModerado ?? req.body.porcentajeModerado,
+                        porcentajeIntenso: e.porcentajeIntenso ?? req.body.porcentajeIntenso
                     }
                 },
                 antecedentes: {
@@ -134,6 +168,7 @@ export const create = async (req, res, next) => {
                         alergias: a.alergias ?? a.alergico ?? req.body.alergias ?? req.body.alergico,
                         patologia: a.patologia ?? req.body.patologia,
                         cirugias: a.cirugias ?? req.body.cirugias,
+                        farmacos: a.farmacos ?? req.body.farmacos,
                         estrenimiento: a.estrenimiento ?? h.estrenimiento ?? req.body.estrenimiento,
                         consumoAlcohol: a.consumoAlcohol ?? a.alcohol ?? h.consumoAlcohol ?? h.alcohol ?? req.body.consumoAlcohol ?? req.body.alcohol,
                         tabaco: a.tabaco ?? h.tabaco ?? req.body.tabaco,
@@ -141,7 +176,8 @@ export const create = async (req, res, next) => {
                         cicloMenstrual: a.cicloMenstrual ?? h.cicloMenstrual ?? req.body.cicloMenstrual,
                         signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                         historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
-                        recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos
+                        recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
+                        suplementosDetalle: a.suplementosDetalle ?? req.body.suplementosDetalle ?? undefined
                     }
                 },
                 consumoCalorico: {
@@ -258,6 +294,7 @@ export const getById = async (req, res, next) => {
                 alergias: ant.alergias,
                 patologia: ant.patologia,
                 cirugias: ant.cirugias,
+                farmacos: ant.farmacos,
                 estrenimiento: ant.estrenimiento,
                 consumoAlcohol: ant.consumoAlcohol,
                 tabaco: ant.tabaco,
@@ -265,7 +302,8 @@ export const getById = async (req, res, next) => {
                 cicloMenstrual: ant.cicloMenstrual,
                 signosYSintomas: ant.signosYSintomas,
                 historialProductos: ant.historialProductos,
-                recomendacionSuplementos: ant.recomendacionSuplementos
+                recomendacionSuplementos: ant.recomendacionSuplementos,
+                suplementosDetalle: ant.suplementosDetalle ?? []
             } : {},
             habitos: cc ? {
                 ...cc,
@@ -350,6 +388,30 @@ export const update = async (req, res, next) => {
         const s = suplementacion || {};
         const c24 = consumo24h || h;
 
+        if (data.telefono) {
+            const telLimpo = data.telefono.replace(/\D/g, '');
+            if (telLimpo.length >= 10) {
+                const targetTel = telLimpo.slice(-10);
+                const existsPhone = await prisma.paciente.findFirst({
+                    where: { telefono: { endsWith: targetTel }, id: { not: id } },
+                    select: { id: true }
+                });
+                if (existsPhone) {
+                    return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente. Revisa la información.' });
+                }
+            } else {
+                const exists = await prisma.paciente.findFirst({ where: { telefono: data.telefono, id: { not: id } } });
+                if (exists) return res.status(409).json({ success: false, error: 'El número de teléfono ya pertenece a otro paciente.' });
+            }
+        }
+        
+        if (data.email) {
+            const existsEmail = await prisma.paciente.findFirst({ where: { email: data.email.trim(), id: { not: id } } });
+            if (existsEmail) {
+                return res.status(409).json({ success: false, error: 'Este correo electrónico (email) ya está registrado en otro expediente.' });
+            }
+        }
+
         const updated = await prisma.paciente.update({
             where: { id },
             data: {
@@ -359,6 +421,7 @@ export const update = async (req, res, next) => {
                         update: {
                             objetivo: e.objetivo,
                             gymOrigen: e.gymOrigen,
+                            horaEntrenamiento: e.horaEntrenamiento ?? undefined,
                             disciplina: e.disciplina,
                             frecuencia: e.frecuencia,
                             tiempo: e.tiempo,
@@ -371,6 +434,7 @@ export const update = async (req, res, next) => {
                         create: {
                             objetivo: e.objetivo,
                             gymOrigen: e.gymOrigen,
+                            horaEntrenamiento: e.horaEntrenamiento ?? undefined,
                             disciplina: e.disciplina,
                             frecuencia: e.frecuencia,
                             tiempo: e.tiempo,
@@ -390,6 +454,7 @@ export const update = async (req, res, next) => {
                             alergias: a.alergias ?? a.alergico ?? req.body.alergias ?? req.body.alergico,
                             patologia: a.patologia ?? req.body.patologia,
                             cirugias: a.cirugias ?? req.body.cirugias,
+                            farmacos: a.farmacos ?? req.body.farmacos,
                             estrenimiento: a.estrenimiento ?? h.estrenimiento ?? req.body.estrenimiento,
                             consumoAlcohol: a.consumoAlcohol ?? a.alcohol ?? h.consumoAlcohol ?? h.alcohol ?? req.body.consumoAlcohol ?? req.body.alcohol,
                             tabaco: a.tabaco ?? h.tabaco ?? req.body.tabaco,
@@ -397,7 +462,8 @@ export const update = async (req, res, next) => {
                             cicloMenstrual: a.cicloMenstrual ?? h.cicloMenstrual ?? req.body.cicloMenstrual,
                             signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                             historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
-                            recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos
+                            recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
+                            suplementosDetalle: a.suplementosDetalle ?? undefined
                         },
                         create: {
                             alimentosNoGustan: a.alimentosNoGustan ?? a.alimentosNoGusta ?? req.body.alimentosNoGustan ?? req.body.alimentosNoGusta,
@@ -405,6 +471,7 @@ export const update = async (req, res, next) => {
                             alergias: a.alergias ?? a.alergico ?? req.body.alergias ?? req.body.alergico,
                             patologia: a.patologia ?? req.body.patologia,
                             cirugias: a.cirugias ?? req.body.cirugias,
+                            farmacos: a.farmacos ?? req.body.farmacos,
                             estrenimiento: a.estrenimiento ?? h.estrenimiento ?? req.body.estrenimiento,
                             consumoAlcohol: a.consumoAlcohol ?? a.alcohol ?? h.consumoAlcohol ?? h.alcohol ?? req.body.consumoAlcohol ?? req.body.alcohol,
                             tabaco: a.tabaco ?? h.tabaco ?? req.body.tabaco,
@@ -412,7 +479,8 @@ export const update = async (req, res, next) => {
                             cicloMenstrual: a.cicloMenstrual ?? h.cicloMenstrual ?? req.body.cicloMenstrual,
                             signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                             historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
-                            recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos
+                            recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
+                            suplementosDetalle: a.suplementosDetalle ?? undefined
                         }
                     }
                 } : undefined,

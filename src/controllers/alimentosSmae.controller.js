@@ -29,8 +29,8 @@ export const getAll = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const {
-            nombre, grupo, pesoGramos,
-            porcionCasera, cantidadPorcion, unidadPorcion, notas
+            nombre, grupo, equivalentesBase, pesoGramos, unidadBase,
+            porcionCasera, cantidadPorcion, unidadPorcion, notas, equivalencias
         } = req.body;
 
         if (!nombre || !grupo || pesoGramos === undefined) {
@@ -41,11 +41,14 @@ export const create = async (req, res, next) => {
             data: {
                 nombre: nombre.trim(),
                 grupo,
+                equivalentesBase: equivalentesBase !== undefined ? parseFloat(equivalentesBase) : 1,
                 pesoGramos: parseFloat(pesoGramos),
+                unidadBase: unidadBase?.trim() || 'g',
                 porcionCasera: porcionCasera?.trim() || null,
                 cantidadPorcion: cantidadPorcion !== undefined ? parseFloat(cantidadPorcion) : null,
                 unidadPorcion: unidadPorcion?.trim() || null,
                 notas: notas?.trim() || null,
+                equivalencias: Array.isArray(equivalencias) ? equivalencias : null,
                 esPersonalizado: true  // Los creados vía API siempre son personalizados
             }
         });
@@ -60,18 +63,21 @@ export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
         const {
-            nombre, grupo, pesoGramos,
-            porcionCasera, cantidadPorcion, unidadPorcion, notas
+            nombre, grupo, equivalentesBase, pesoGramos, unidadBase,
+            porcionCasera, cantidadPorcion, unidadPorcion, notas, equivalencias
         } = req.body;
 
         const dataToUpdate = {};
-        if (nombre !== undefined)          dataToUpdate.nombre          = nombre.trim();
-        if (grupo !== undefined)           dataToUpdate.grupo           = grupo;
-        if (pesoGramos !== undefined)      dataToUpdate.pesoGramos      = parseFloat(pesoGramos);
+        if (nombre !== undefined)            dataToUpdate.nombre           = nombre.trim();
+        if (grupo !== undefined)             dataToUpdate.grupo            = grupo;
+        if (equivalentesBase !== undefined)  dataToUpdate.equivalentesBase = parseFloat(equivalentesBase);
+        if (pesoGramos !== undefined)        dataToUpdate.pesoGramos       = parseFloat(pesoGramos);
+        if (unidadBase !== undefined)      dataToUpdate.unidadBase      = unidadBase?.trim() || 'g';
         if (porcionCasera !== undefined)   dataToUpdate.porcionCasera   = porcionCasera?.trim() || null;
         if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = parseFloat(cantidadPorcion);
         if (unidadPorcion !== undefined)   dataToUpdate.unidadPorcion   = unidadPorcion?.trim() || null;
         if (notas !== undefined)           dataToUpdate.notas           = notas?.trim() || null;
+        if (equivalencias !== undefined)   dataToUpdate.equivalencias   = Array.isArray(equivalencias) ? equivalencias : null;
 
         const alimento = await prisma.alimentoSMAE.update({
             where: { id },

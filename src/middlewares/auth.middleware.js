@@ -10,7 +10,9 @@ export const authMiddleware = (req, res, next) => {
 
     const token = authHeader.split(' ')[1];
     try {
-        req.user = jwt.verify(token, process.env.JWT_SECRET);
+        const payload = jwt.verify(token, process.env.JWT_SECRET);
+        if (payload.type === 'portal') return error(res, 'No autorizado', 401);
+        req.user = payload;
         next();
     } catch {
         return error(res, 'No autorizado: Token inválido o expirado', 401);
@@ -23,7 +25,7 @@ export const authMiddleware = (req, res, next) => {
  */
 export const requireAdmin = (req, res, next) => {
     if (!req.user) return error(res, 'No autenticado', 401);
-    if (req.user.rol !== 'admin') return error(res, 'Acceso denegado: se requiere rol de administrador', 403);
+    if (req.user.rol !== 'admin' && req.user.role !== 'admin') return error(res, 'Acceso denegado: se requiere rol de administrador', 403);
     next();
 };
 
@@ -35,7 +37,7 @@ export const requirePermiso = (modulo, accion = 'read') => (req, res, next) => {
     if (!req.user) return error(res, 'No autenticado', 401);
 
     // El admin siempre tiene acceso total
-    if (req.user.rol === 'admin') return next();
+    if (req.user.rol === 'admin' || req.user.role === 'admin') return next();
 
     const permisos = req.user.permisos || {};
     const moduloPermisos = permisos[modulo] || {};

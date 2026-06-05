@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import errorHandler from './middlewares/errorHandler.js';
 
 // BigInt serialization fix for JSON
-BigInt.prototype.toJSON = function() {
+BigInt.prototype.toJSON = function () {
     return this.toString();
 };
 
@@ -21,21 +21,66 @@ import barridoRoutes from './routes/barrido.routes.js';
 import alimentosSMAERoutes from './routes/alimentosSmae.routes.js';
 import platillosRoutes from './routes/platillos.routes.js';
 import citasRoutes from './routes/citas.routes.js';
+import agentRoutes from './routes/agent.routes.js';
+import webhooksRoutes from './routes/webhooks.routes.js';
+import portalRoutes from './routes/portal.routes.js';
 
 const app = express();
 
+// Stripe webhook — raw body BEFORE express.json()
+app.use('/api/webhooks', webhooksRoutes);
+
 // Security Middlewares
-app.use(helmet());
-app.use(cors({
-    origin: process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173'],
+// crossOriginResourcePolicy se desactiva para permitir requests desde Vercel/otros orígenes
+app.use(helmet({ crossOriginResourcePolicy: false }));
+
+const corsOptions = {
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true); // Permite herramientas locales y Postman
+
+        const allowedOrigins = [
+            'http://localhost:5173',
+            'http://localhost:5174',
+            'http://127.0.0.1:5173',
+        ];
+
+        // Añadir orígenes desde variable de entorno (separados por coma)
+        if (process.env.FRONTEND_URL) {
+            allowedOrigins.push(
+                ...process.env.FRONTEND_URL.split(',').map(u => u.trim().replace(/^"|"$/g, ''))
+            );
+        }
+
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        // Permitir localhost dinámico en desarrollo
+        if (origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+            return callback(null, true);
+        }
+
+        // Permitir previews de Vercel (*.vercel.app) como safety net
+        if (origin.endsWith('.vercel.app')) {
+            return callback(null, true);
+        }
+
+        console.warn(`[CORS] Origin bloqueado: ${origin}`);
+        return callback(new Error(`No permitido por CORS: ${origin}`));
+    },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-}));
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    optionsSuccessStatus: 200, // Algunos browsers legacy usan 204 que falla
+};
+
+app.use(cors(corsOptions));
+// Manejar explícitamente preflight OPTIONS antes de cualquier otra ruta
+app.options('/{*splat}', cors(corsOptions));
 
 // Regular body parsers
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Serve static PDFs from /tmp
 app.use('/temp', express.static('/tmp'));
@@ -57,6 +102,12 @@ app.use('/api/dashboard', authMiddleware, requirePermiso('dashboard', 'read'), d
 app.use('/api/alimentos-smae', authMiddleware, requirePermiso('smae', 'read'), alimentosSMAERoutes);
 app.use('/api/platillos', authMiddleware, platillosRoutes);
 app.use('/api/citas', authMiddleware, citasRoutes);
+
+// Agente nutriólogo — sin JWT (protegido por X-Agent-Key opcional)
+app.use('/api/agent', agentRoutes);
+
+// Portal Norder Health — autenticación por paciente (JWT tipo 'portal')
+app.use('/api/portal', portalRoutes);
 
 // Opcionales o específicos
 app.use('/api/configuracion', authMiddleware, configuracionRoutes);
