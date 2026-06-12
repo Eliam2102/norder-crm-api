@@ -126,7 +126,6 @@ export const agendarCita = async (req, res) => {
     console.error('[agendarCita] Error inesperado:', error.message, error.stack);
     res.status(500).json({
       error: 'Error inesperado al procesar el agendamiento',
-      details: error.message
     });
   }
 };
@@ -134,15 +133,30 @@ export const agendarCita = async (req, res) => {
 export const getEventType = async (req, res) => {
   try {
     const { id } = req.params;
-    const response = await axios.get(`${CALCOM_API_URL}/event-types/${id}`, {
+    // La API v2 no tiene endpoint directo para /v2/event-types/:id
+    // Consultamos todos sin el header de versión (porque la versión 2024-08-13 oculta esta ruta).
+    const response = await axios.get(`${CALCOM_API_URL}/event-types`, {
       headers: {
-        Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
-        'cal-api-version': CALCOM_API_VERSION,
+        Authorization: `Bearer ${process.env.CALCOM_API_KEY}`
       },
     });
 
-    const responseData = response.data?.data || response.data;
-    res.json(responseData);
+    // La respuesta en v2 (sin header de versión específico) viene anidada en eventTypeGroups
+    let eventTypes = [];
+    const groups = response.data?.data?.eventTypeGroups || [];
+    groups.forEach(group => {
+      if (group.eventTypes && Array.isArray(group.eventTypes)) {
+        eventTypes = [...eventTypes, ...group.eventTypes];
+      }
+    });
+
+    const eventType = eventTypes.find(e => String(e.id) === String(id));
+
+    if (!eventType) {
+      return res.status(404).json({ error: 'Tipo de evento no encontrado en Cal.com' });
+    }
+
+    res.json(eventType);
   } catch (err) {
     console.error('Error al obtener tipo de evento en Cal.com:', err.response?.data || err.message);
     res.status(500).json({

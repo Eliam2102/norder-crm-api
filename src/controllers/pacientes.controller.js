@@ -21,6 +21,7 @@ export const getAll = async (req, res, next) => {
             where,
             include: {
                 valoraciones: {
+                    where: { deletedAt: null },
                     orderBy: [
                         { fecha: 'desc' },
                         { numeroValoracion: 'desc' }
@@ -177,7 +178,8 @@ export const create = async (req, res, next) => {
                         signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                         historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
                         recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
-                        suplementosDetalle: a.suplementosDetalle ?? req.body.suplementosDetalle ?? undefined
+                        suplementosDetalle: a.suplementosDetalle ?? req.body.suplementosDetalle ?? undefined,
+                        farmacosDetalle: a.farmacosDetalle ?? req.body.farmacosDetalle ?? undefined
                     }
                 },
                 consumoCalorico: {
@@ -224,6 +226,7 @@ export const getById = async (req, res, next) => {
                 consumoCalorico: true,
                 antecedentes: true,
                 valoraciones: { 
+                    where: { deletedAt: null },
                     orderBy: [
                         { fecha: 'desc' },
                         { numeroValoracion: 'desc' }
@@ -303,7 +306,8 @@ export const getById = async (req, res, next) => {
                 signosYSintomas: ant.signosYSintomas,
                 historialProductos: ant.historialProductos,
                 recomendacionSuplementos: ant.recomendacionSuplementos,
-                suplementosDetalle: ant.suplementosDetalle ?? []
+                suplementosDetalle: ant.suplementosDetalle ?? [],
+                farmacosDetalle: ant.farmacosDetalle ?? []
             } : {},
             habitos: cc ? {
                 ...cc,
@@ -463,7 +467,8 @@ export const update = async (req, res, next) => {
                             signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                             historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
                             recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
-                            suplementosDetalle: a.suplementosDetalle ?? undefined
+                            suplementosDetalle: a.suplementosDetalle ?? undefined,
+                            farmacosDetalle: a.farmacosDetalle ?? undefined
                         },
                         create: {
                             alimentosNoGustan: a.alimentosNoGustan ?? a.alimentosNoGusta ?? req.body.alimentosNoGustan ?? req.body.alimentosNoGusta,
@@ -480,7 +485,8 @@ export const update = async (req, res, next) => {
                             signosYSintomas: a.signosYSintomas ?? a.signosSintomas ?? h.signosYSintomas ?? h.signosSintomas ?? req.body.signosYSintomas ?? req.body.signosSintomas,
                             historialProductos: a.historialProductos ?? s.historialProductos ?? req.body.historialProductos,
                             recomendacionSuplementos: a.recomendacionSuplementos ?? a.recomSuplementos ?? s.recomendacionSuplementos ?? s.recomSuplementos ?? req.body.recomendacionSuplementos ?? req.body.recomSuplementos,
-                            suplementosDetalle: a.suplementosDetalle ?? undefined
+                            suplementosDetalle: a.suplementosDetalle ?? undefined,
+                            farmacosDetalle: a.farmacosDetalle ?? undefined
                         }
                     }
                 } : undefined,

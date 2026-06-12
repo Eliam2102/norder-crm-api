@@ -31,7 +31,7 @@ export const getAll = async (req, res, next) => {
 
         const planes = await prisma.plan.findMany({
             where: whereClause,
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } },
+            include: { menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } } },
             orderBy: { fechaCreacion: 'desc' }
         });
         return ok(res, planes);
@@ -45,7 +45,7 @@ export const getActivo = async (req, res, next) => {
         const { pacienteId } = req.params;
         const plan = await prisma.plan.findFirst({
             where: { pacienteId, estado: 'activo' },
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } },
+            include: { menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } } },
             orderBy: { fechaCreacion: 'desc' }
         });
         return ok(res, plan || {});
@@ -99,7 +99,7 @@ export const create = async (req, res, next) => {
         let pesoKg = 0;
         if (pacienteId) {
             const ultimaVal = await prisma.valoracion.findFirst({
-                where: { pacienteId },
+                where: { pacienteId, deletedAt: null },
                 orderBy: { fecha: 'desc' },
                 select: { pesoActual: true }
             });
@@ -179,7 +179,7 @@ export const create = async (req, res, next) => {
                                     tiempoComidaId: tiempo.id,
                                     descripcion: iData.descripcion || '',
                                     cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
-                                    unidad: iData.unidad || 'GR',
+                                    unidad: (iData.unidad || 'gr').toLowerCase(),
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     platillo: iData.platillo || '',
@@ -247,7 +247,7 @@ export const create = async (req, res, next) => {
                                     grupo,
                                     pesoGramos: parseFloat(iData.cantidad) || 0,
                                     cantidadPorcion: 1,
-                                    unidadPorcion: iData.unidad || 'PZA',
+                                    unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
                                     esPersonalizado: true,
                                     // Guardar grupos adicionales de equivalencia si existen
                                     equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0
@@ -273,7 +273,7 @@ export const create = async (req, res, next) => {
                                     ingredientes: pData.ingredientes.map(i => ({
                                         descripcion: i.descripcion || '',
                                         cantidad: i.cantidad?.toString() || '0',
-                                        unidad: i.unidad || 'GR',
+                                        unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
                                         eqGrupo: i.eqGrupo || ''
                                     }))
@@ -290,7 +290,7 @@ export const create = async (req, res, next) => {
 
         const planFinal = await prisma.plan.findUnique({
             where: { id: nuevoPlan.id },
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } }
+            include: { menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } } }
         });
 
         return ok(res, planFinal, 201);
@@ -304,7 +304,7 @@ export const getById = async (req, res, next) => {
         const plan = await prisma.plan.findUniqueOrThrow({
             where: { id: req.params.id },
             include: {
-                menus: { include: { tiemposComida: { include: { ingredientes: true } } } },
+                menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } },
                 paciente: {
                     include: {
                         valoraciones: {
@@ -359,7 +359,7 @@ export const update = async (req, res, next) => {
         let pesoKg = 0;
         if (existingPlan?.pacienteId) {
             const ultimaVal = await prisma.valoracion.findFirst({
-                where: { pacienteId: existingPlan.pacienteId },
+                where: { pacienteId: existingPlan.pacienteId, deletedAt: null },
                 orderBy: { fecha: 'desc' },
                 select: { pesoActual: true }
             });
@@ -421,7 +421,7 @@ export const update = async (req, res, next) => {
                                     tiempoComidaId: tiempo.id,
                                     descripcion: iData.descripcion || '',
                                     cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
-                                    unidad: iData.unidad || 'GR',
+                                    unidad: (iData.unidad || 'gr').toLowerCase(),
                                     eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
                                     eqGrupo: iData.eqGrupo || '',
                                     platillo: iData.platillo || '',
@@ -486,7 +486,7 @@ export const update = async (req, res, next) => {
                                     grupo,
                                     pesoGramos: parseFloat(iData.cantidad) || 0,
                                     cantidadPorcion: 1,
-                                    unidadPorcion: iData.unidad || 'PZA',
+                                    unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
                                     esPersonalizado: true,
                                     equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0 ? iData.equivalencias : null
                                 }
@@ -508,7 +508,7 @@ export const update = async (req, res, next) => {
                                     ingredientes: pData.ingredientes.map(i => ({
                                         descripcion: i.descripcion || '',
                                         cantidad: i.cantidad?.toString() || '0',
-                                        unidad: i.unidad || 'GR',
+                                        unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
                                         eqGrupo: i.eqGrupo || '',
                                         equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
@@ -526,7 +526,7 @@ export const update = async (req, res, next) => {
 
         const planFinal = await prisma.plan.findUnique({
             where: { id },
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } }
+            include: { menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } } }
         });
 
         return ok(res, planFinal);
@@ -558,6 +558,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         let rawValoraciones = await prisma.valoracion.findMany({
             where: {
                 pacienteId: plan.pacienteId,
+                deletedAt: null,
                 fecha: { lte: dateLimit } // Solo valoraciones hasta esa fecha
             },
             orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
@@ -581,6 +582,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 ectomorfico: true,
                 suplementacion: true,
                 comentarios: true,
+                notasLibres: true,
                 evitar: true,
                 temarioConsulta: true,
                 barrido: {
@@ -600,6 +602,55 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 }
             }
         });
+
+        // Fallback: si no hay valoraciones hasta dateLimit (p.ej. la valoración se creó
+        // DESPUÉS del plan), re-consultamos sin límite de fecha para que temario,
+        // notas clínicas y "evitar" no salgan en blanco en el PDF.
+        if (rawValoraciones.length === 0) {
+            rawValoraciones = await prisma.valoracion.findMany({
+                where: { pacienteId: plan.pacienteId, deletedAt: null },
+                orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
+                take: 20,
+                select: {
+                    id: true,
+                    fecha: true,
+                    pesoActual: true,
+                    estatura: true,
+                    imc: true,
+                    pctGrasaCorp: true,
+                    pctGrasa2comp: true,
+                    masaMagra: true,
+                    masaGrasaReal: true,
+                    kgGrasa2comp: true,
+                    numeroValoracion: true,
+                    clasificacionIp: true,
+                    clasifComplexion: true,
+                    endomorfico: true,
+                    mesomorfico: true,
+                    ectomorfico: true,
+                    suplementacion: true,
+                    comentarios: true,
+                    notasLibres: true,
+                    evitar: true,
+                    temarioConsulta: true,
+                    barrido: {
+                        select: {
+                            kcalTotal: true
+                        }
+                    },
+                    paciente: {
+                        select: {
+                            complexion: true,
+                            datosEjercicio: {
+                                select: {
+                                    objetivo: true
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
 
         // Reloj histórico: Solo mostramos las últimas 7.
         valoraciones = rawValoraciones.slice(0, 7);
@@ -737,7 +788,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
     } else if (plan.pacienteId) {
         // 3. Buscar en la valoración más reciente del paciente (fallback)
         const valReciente = await prisma.valoracion.findFirst({
-            where: { pacienteId: plan.pacienteId },
+            where: { pacienteId: plan.pacienteId, deletedAt: null },
             orderBy: { fecha: 'desc' },
             select: { suplementosDetalle: true, suplementacion: true }
         });
@@ -796,14 +847,25 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
 
     plan.temarioReciente = [];
+    plan.competenciaReciente = null;
     if (ultimaVal?.temarioConsulta) {
-        plan.temarioReciente = ultimaVal.temarioConsulta.map(t => ({
-            tema: t.tema,
-            detalle: t.detalle
-        }));
+        const compItem = ultimaVal.temarioConsulta.find(t => t.tema === '__COMPETENCIA_NOTES__');
+        if (compItem) {
+            try {
+                const comp = JSON.parse(compItem.detalle || '{}');
+                if (comp.antes || comp.durante || comp.despues) plan.competenciaReciente = comp;
+            } catch { /* ignora JSON inválido */ }
+        }
+        plan.temarioReciente = ultimaVal.temarioConsulta
+            .filter(t => t.tema !== '__COMPETENCIA_NOTES__')
+            .map(t => ({
+                tema: t.tema,
+                detalle: t.detalle
+            }));
     }
 
     plan.notasClinicasRecientes = ultimaVal?.comentarios || "";
+    plan.notasLibresRecientes = ultimaVal?.notasLibres || "";
 
     plan.evitarReciente = [];
     if (ultimaVal?.evitar) {
@@ -843,7 +905,7 @@ export const generatePdf = async (req, res, next) => {
             where: { id: req.params.id },
             include: {
                 paciente: true,
-                menus: { include: { tiemposComida: { include: { ingredientes: true } } } }
+                menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } }
             }
         });
 
@@ -892,7 +954,7 @@ export const generatePdfPreview = async (req, res, next) => {
             where: { id: req.params.id },
             include: {
                 paciente: true,
-                menus: { include: { tiemposComida: { include: { ingredientes: true } } } }
+                menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } }
             }
         });
 
@@ -935,7 +997,7 @@ export const sendPlan = async (req, res, next) => {
                 menus: {
                     include: {
                         tiemposComida: {
-                            include: { ingredientes: true },
+                            include: { ingredientes: { orderBy: { orden: 'asc' } } },
                             orderBy: { orden: 'asc' }
                         }
                     },
@@ -1074,7 +1136,7 @@ export const asignarPlan = async (req, res, next) => {
         // 1. Obtener plan original con toda su estructura
         const original = await prisma.plan.findUniqueOrThrow({
             where: { id },
-            include: { menus: { include: { tiemposComida: { include: { ingredientes: true } } } } }
+            include: { menus: { orderBy: { orden: 'asc' }, include: { tiemposComida: { orderBy: { orden: 'asc' }, include: { ingredientes: { orderBy: { orden: 'asc' } } } } } } }
         });
 
         // Archivar planes anteriores del nuevo paciente

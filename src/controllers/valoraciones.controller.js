@@ -5,8 +5,8 @@ export const getAll = async (req, res, next) => {
     try {
         const { pacienteId } = req.params;
         const valoraciones = await prisma.valoracion.findMany({
-            where: { pacienteId },
-            include: { 
+            where: { pacienteId, deletedAt: null },  // A1: excluir eliminadas
+            include: {
                 temarioConsulta: true,
                 barrido: { select: { id: true, kcalTotal: true, porciones: true } },
                 planes: {
@@ -40,7 +40,7 @@ export const getAll = async (req, res, next) => {
                     try {
                         const pJson = JSON.parse(barrido.porciones || '{}');
                         hasBarrido = Object.values(pJson).some(val => Number(val) > 0);
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
 
@@ -52,13 +52,13 @@ export const getAll = async (req, res, next) => {
                 estadoFlujo = 'Listo para enviar';
             }
 
-            return { 
-                ...rest, 
+            return {
+                ...rest,
                 barrido,
                 hasBarrido,
                 estadoFlujo,
                 plan: specificPlan || null,
-                planId: specificPlan?.id || null 
+                planId: specificPlan?.id || null
             };
         }));
     } catch (err) {
@@ -69,15 +69,15 @@ export const getAll = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const { pacienteId } = req.params;
-        
+
         const ultimaVal = await prisma.valoracion.findFirst({
             where: { pacienteId },
             orderBy: { numeroValoracion: 'desc' }
         });
         const numeroValoracion = (ultimaVal?.numeroValoracion || 0) + 1;
 
-        const { 
-            id: _, 
+        const {
+            id: _,
             pacienteId: __,
             temario, temarioConsulta,
             pliegues, perimetros,
@@ -94,23 +94,23 @@ export const create = async (req, res, next) => {
             pctGrasa,       // frontend lo manda así → guardar como pctGrasa2comp
             masaMagra,      // campo a guardar directamente en el modelo
             suplementosDetalle,
-            ...rest 
+            ...rest
         } = req.body;
 
         const pesoVal = rest.pesoActual ?? (peso ? parseFloat(peso) : undefined);
         const pctGrasaVal = pctGrasa !== undefined ? parseFloat(pctGrasa) : undefined;
 
-        const vData = { 
+        const vData = {
             ...rest,
             suplementosDetalle: suplementosDetalle || [],
             pesoActual: pesoVal,
             deficitMusculo: rest.deficitMusculo ?? deficitMuscular,
             estatura: rest.estatura ?? (talla ? parseFloat(talla) : undefined),
             // Mapeo y cálculo automático de compartimentos (2 Comp)
-            ...(pctGrasaVal !== undefined && { 
+            ...(pctGrasaVal !== undefined && {
                 pctGrasa2comp: pctGrasaVal,
                 // Cálculo automático de kg de grasa si tenemos el peso
-                ...(pesoVal && { 
+                ...(pesoVal && {
                     kgGrasa2comp: (pesoVal * pctGrasaVal) / 100,
                     kgMasaMagra2comp: pesoVal - ((pesoVal * pctGrasaVal) / 100)
                 })
@@ -214,17 +214,19 @@ export const getById = async (req, res, next) => {
                 },
                 temarioConsulta: true,
                 revisiones: true,
-                planes: { 
-                    include: { 
-                        menus: { 
-                            include: { 
-                                tiemposComida: { 
-                                    include: { 
-                                        ingredientes: true 
-                                    } 
-                                } 
-                            } 
-                        } 
+                planes: {
+                    include: {
+                        menus: {
+                            orderBy: { orden: 'asc' },
+                            include: {
+                                tiemposComida: {
+                                    orderBy: { orden: 'asc' },
+                                    include: {
+                                        ingredientes: { orderBy: { orden: 'asc' } }
+                                    }
+                                }
+                            }
+                        }
                     },
                     orderBy: { fechaCreacion: 'desc' }
                 }
@@ -232,7 +234,7 @@ export const getById = async (req, res, next) => {
         });
 
         const { planes, ...rest } = valoracion;
-        
+
         // El plan de esta valoración específica
         const specificPlan = planes.find(p => p.valoracionId === valoracion.id);
 
@@ -302,7 +304,7 @@ export const getById = async (req, res, next) => {
 export const update = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { 
+        const {
             id: _id,
             temario, temarioConsulta,
             pliegues, perimetros,
@@ -314,18 +316,23 @@ export const update = async (req, res, next) => {
             deficitMuscular, talla,
             createdAt, updatedAt,
             suplementosDetalle,
-            ...rest 
+            // Nuevo payload simplificado del frontend (no son columnas, se mapean abajo)
+            pctGrasa,
+            ...rest
         } = req.body;
 
         const pesoVal = rest.pesoActual ?? (rest.peso ? parseFloat(rest.peso) : undefined);
-        const pctGrasaVal = rest.pctGrasa2comp ?? (rest.pctGrasa ? parseFloat(rest.pctGrasa) : undefined);
+        const pctGrasaVal = rest.pctGrasa2comp ?? (pctGrasa !== undefined ? parseFloat(pctGrasa) : undefined);
 
         const vData = { ...rest };
+        if (rest.fecha) {
+            vData.fecha = new Date(rest.fecha);
+        }
         if (suplementosDetalle !== undefined) vData.suplementosDetalle = suplementosDetalle || [];
         if (deficitMuscular) vData.deficitMusculo = deficitMuscular;
         if (talla) vData.estatura = talla;
         if (pesoVal) vData.pesoActual = pesoVal;
-        
+
         // Cálculo automático en el update
         if (pctGrasaVal !== undefined) {
             vData.pctGrasa2comp = pctGrasaVal;
@@ -374,9 +381,29 @@ export const update = async (req, res, next) => {
         vData.creatinina = creatinina ?? vData.creatinina;
         vData.acidoUrico = acidoUrico ?? vData.acidoUrico;
 
+        // Temario: el frontend manda el array completo en cada edición (incluye notas de
+        // Competencia como ítem __COMPETENCIA_NOTES__). Antes se descartaba en el update
+        // (solo create lo guardaba) — se reemplaza por completo (delete + recreate).
+        const temarioItems = temario || temarioConsulta;
+        if (Array.isArray(temarioItems)) {
+            const { pacienteId } = req.params;
+            vData.temarioConsulta = {
+                deleteMany: {},
+                create: temarioItems
+                    .filter(t => t.tema || t.detalle)
+                    .map(t => ({
+                        pacienteId,
+                        tema: t.tema || 'Consulta General',
+                        detalle: t.detalle,
+                        orden: t.orden
+                    }))
+            };
+        }
+
         const updated = await prisma.valoracion.update({
             where: { id },
-            data: vData
+            data: vData,
+            include: { temarioConsulta: true }
         });
         return ok(res, updated);
     } catch (err) {
@@ -390,6 +417,64 @@ export const comparar = async (req, res, next) => {
         const val1 = await prisma.valoracion.findUniqueOrThrow({ where: { id: v1 } });
         const val2 = await prisma.valoracion.findUniqueOrThrow({ where: { id: v2 } });
         return ok(res, { v1: val1, v2: val2 });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// A1: Soft delete — marca la valoración como eliminada sin borrar datos
+export const softDelete = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        // Verificar que existe y no está ya eliminada
+        const existing = await prisma.valoracion.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Valoración no encontrada' });
+        if (existing.deletedAt) return res.status(409).json({ error: 'Ya fue eliminada' });
+
+        const deleted = await prisma.valoracion.update({
+            where: { id },
+            data: { deletedAt: new Date() }
+        });
+        return ok(res, { ok: true, deletedAt: deleted.deletedAt });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// B9: Restaurar valoración eliminada
+export const restore = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const existing = await prisma.valoracion.findUnique({ where: { id } });
+        if (!existing) return res.status(404).json({ error: 'Valoración no encontrada' });
+        if (!existing.deletedAt) return res.status(409).json({ error: 'No está eliminada' });
+
+        const restored = await prisma.valoracion.update({
+            where: { id },
+            data: { deletedAt: null }
+        });
+        return ok(res, { ok: true, restoredAt: new Date() });
+    } catch (err) {
+        next(err);
+    }
+};
+
+// B9: Listar valoraciones archivadas (deletedAt != null) del paciente
+export const getArchivadas = async (req, res, next) => {
+    try {
+        const { pacienteId } = req.params;
+        const archivadas = await prisma.valoracion.findMany({
+            where: { pacienteId, deletedAt: { not: null } },
+            select: {
+                id: true,
+                numeroValoracion: true,
+                fecha: true,
+                pesoActual: true,
+                deletedAt: true,
+            },
+            orderBy: { deletedAt: 'desc' }
+        });
+        return ok(res, archivadas);
     } catch (err) {
         next(err);
     }
