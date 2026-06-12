@@ -107,6 +107,7 @@ model Antecedentes {
   historialProductos       String? @map("historial_productos")
   recomendacionSuplementos String? @map("recomendacion_suplementos")
   suplementosDetalle       Json?   @map("suplementos_detalle")
+  farmacosDetalle          Json?   @map("farmacos_detalle")
 
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
@@ -217,7 +218,8 @@ model Valoracion {
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
-  createdAt               DateTime @default(now()) @map("created_at")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  deletedAt               DateTime? @map("deleted_at")  // soft delete
 
   paciente        Paciente              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
   temarioConsulta TemarioConsulta[]

@@ -21,7 +21,8 @@
 
         .page {
             width: 297mm;
-            min-height: 210mm;
+            height: 210mm;
+            overflow: hidden;
             padding: 15mm 18mm;
             position: relative;
             page-break-after: always;
@@ -136,31 +137,58 @@
             transform: translateX(60px);
         }
 
-        /* MENU GRID */
+        /* ── MENU GRID — Layout auto-escalable ────────────────────────────── */
+        /* .menu-page convierte la página en columna flex para que el grid
+           se expanda y llene exactamente el espacio disponible */
+        .menu-page {
+            display: flex;
+            flex-direction: column;
+        }
+        /* Wrapper que ocupa todo el espacio bajo el header */
+        .menu-page-body {
+            flex: 1;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        /* El grid en sí es también una columna flex */
         .menu-grid {
             border: 1px solid #000;
             width: 100%;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
+        /* Cada fila de contenido se reparte el espacio equitativamente */
         .menu-row {
             display: flex;
             border-bottom: 1px solid #000;
-            min-height: 40px;
-            page-break-inside: avoid; /* Evitar que un tiempo de comida se parta en 2 hojas */
+            flex: 1;
+            min-height: 0;
+            overflow: hidden;
+        }
+        /* Filas fijas (cabecera y footer) NO se expanden */
+        .menu-row.fixed-row {
+            flex: 0 0 auto;
         }
         .menu-row:last-child { border-bottom: none; }
         .menu-col {
             flex: 1;
             border-right: 1px solid #000;
-            padding: 6px;
+            padding: 5px 6px;
+            overflow: hidden;
+            min-height: 0;
         }
         .menu-col:last-child { border-right: none; }
-        .menu-time { font-weight: bold; text-transform: uppercase; margin-bottom: 4px; font-size: 10px; }
+        /* Tamaños base — serán sobreescritos por el bloque dinámico en página 2 */
+        .menu-time { font-weight: bold; text-transform: uppercase; margin-bottom: 3px; font-size: 10px; }
         .menu-time-subtitle { font-weight: normal; text-transform: none; font-size: 8px; display: block; margin-top: 1px; }
-        .menu-item { margin-bottom: 2px; padding-left: 10px; font-size: 8.5px; line-height: 1.35; }
-        .menu-sub  { display: block; padding-left: 14px; font-size: 7.8px; color: #555; line-height: 1.3; }
-        .menu-water { margin-top: 8px; font-size: 9px; }
-        .menu-bebida { margin-top: 4px; font-size: 9px; color: #000; }
-        .menu-supl { margin-top: 3px; font-size: 9px; color: #000; }
+        .menu-item { margin-bottom: 2px; padding-left: 10px; font-size: 8.5px; line-height: 1.3; }
+        .menu-sub  { display: block; padding-left: 14px; font-size: 7.5px; color: #555; line-height: 1.25; }
+        .menu-water { margin-top: 5px; font-size: 9px; }
+        .menu-bebida { margin-top: 3px; font-size: 9px; color: #000; }
+        .menu-supl { margin-top: 2px; font-size: 9px; color: #000; }
         .supl-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px; }
         .supl-table th, .supl-table td { border: 1px solid #000; padding: 4px 8px; text-align: left; }
         .supl-table th { background: #f0f0f0; font-weight: 700; }
@@ -283,34 +311,58 @@
                 </tr>
             </table>
 
-            <!-- Lineamientos -->
-            <div class="font-bold" style="margin-bottom: 4px;">Lineamientos:</div>
-            <ul class="bullet-list" style="list-style-type: none;">
-                <% 
-                   const lineamientosDefault = ["Aprender porciones","Consumo de agua mínimo 2.5 lts, no se considera el líquido consumido en el entrenamiento","Importante consumir vegetales en desayuno, almuerzo y cena.","Pesar y medir los alimentos (cocidos)","Visita www.norder.mx para conocer nuestras marcas afiliadas."];
-                   const lArray = plan.lineamientosRecientes || meta.lineamientos || lineamientosDefault;
-                   lArray.forEach(item => { 
-                %>
-                    <li>- &nbsp;&nbsp;<%= item %></li>
-                <% }); %>
-            </ul>
+            <% 
+               const lArray = (plan.lineamientosRecientes && plan.lineamientosRecientes.length > 0)
+                   ? plan.lineamientosRecientes
+                   : ((meta.lineamientos && meta.lineamientos.length > 0) ? meta.lineamientos : []);
+               
+               if (lArray.length > 0) {
+            %>
+                <div class="font-bold" style="margin-bottom: 4px;">Lineamientos:</div>
+                <ul class="bullet-list" style="list-style-type: none;">
+                    <% lArray.forEach(item => { %>
+                        <li>- &nbsp;&nbsp;<%= item %></li>
+                    <% }); %>
+                </ul>
+            <% } %>
 
             <!-- Observaciones / Notas Generales -->
             <div class="font-bold" style="margin-bottom: 4px;">Notas en consulta:</div>
             <ul class="bullet-list" style="list-style-type: none;">
-                <% 
-                   const notasArray = (plan.notasGenerales || "").split(/\r?\n/).filter(n => n.trim() !== '');
+                <%
+                   let notasArray = (plan.notasGenerales || "").split(/\r?\n/).filter(n => n.trim() !== '');
+                   if (notasArray.length === 0) {
+                       notasArray = (plan.notasClinicasRecientes || "").split(/\r?\n/).filter(n => n.trim() !== '');
+                   }
                    if (notasArray.length > 0) {
-                       notasArray.forEach(item => { 
+                       notasArray.forEach(item => {
                 %>
                     <li>- &nbsp;&nbsp;<strong><%= item.trim() %></strong></li>
-                <% 
+                <%
                        });
-                   } else { 
+                   } else {
                 %>
                     <li>- &nbsp;&nbsp;Ninguna</li>
                 <% } %>
             </ul>
+
+            <% if (plan.notasLibresRecientes && plan.notasLibresRecientes.trim() !== "") { %>
+                <div class="font-bold" style="margin-bottom: 4px;">Notas libres / Seguimiento:</div>
+                <ul class="bullet-list" style="list-style-type: none;">
+                    <% plan.notasLibresRecientes.split(/\r?\n/).filter(n => n.trim() !== '').forEach(item => { %>
+                        <li>- &nbsp;&nbsp;<%= item.trim() %></li>
+                    <% }); %>
+                </ul>
+            <% } %>
+
+            <% if (plan.temarioReciente && plan.temarioReciente.length > 0) { %>
+                <div class="font-bold" style="margin-bottom: 4px;">Temario abordado:</div>
+                <ul class="bullet-list" style="list-style-type: none;">
+                    <% plan.temarioReciente.forEach(tem => { %>
+                        <li>- &nbsp;&nbsp;<strong><%= tem.tema %>:</strong> <%= tem.detalle %></li>
+                    <% }); %>
+                </ul>
+            <% } %>
 
             <% if (meta.notaAmarilla && meta.notaAmarilla.trim() !== "") { %>
                 <div style="text-align:center; margin: 20px 0;"><span class="highlight-yellow"><%= meta.notaAmarilla %></span></div>
@@ -351,11 +403,36 @@
 
 <!-- PAGE 2: MENUS -->
 <% if (showMenus) { %>
-<div class="page">
+<%
+    // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida haya
+    const _nT = timeNames.length;
+    // Factor de escala: 1.0 para ≤4, baja gradualmente hasta 0.58 para 9+
+    const _fS = _nT <= 3 ? 1.0
+              : _nT === 4 ? 0.95
+              : _nT === 5 ? 0.87
+              : _nT === 6 ? 0.79
+              : _nT === 7 ? 0.71
+              : _nT === 8 ? 0.64
+              : 0.58;
+    const _pad  = _nT > 5 ? '3px 4px' : '5px 6px';
+    const _mbI  = _nT > 6 ? '1px' : '2px';
+    const _mtN  = _nT > 5 ? '2px' : '4px';
+%>
+<div class="page menu-page">
     <%- headerHTML %>
-    
+    <!-- Bloque de estilos dinámicos: sobreescribe los base según densidad de contenido -->
+    <style>
+        .menu-time  { font-size: <%- (10   * _fS).toFixed(1) %>px !important; margin-bottom: <%- _nT>6?'1px':'3px' %>; }
+        .menu-item  { font-size: <%- (8.5  * _fS).toFixed(1) %>px !important; line-height: 1.25; margin-bottom: <%- _mbI %>; padding-left: 8px; }
+        .menu-sub   { font-size: <%- (7.2  * _fS).toFixed(1) %>px !important; line-height: 1.2; }
+        .menu-water,.menu-bebida,.menu-supl { font-size: <%- (8.5 * _fS).toFixed(1) %>px !important; margin-top: <%- _mtN %>; }
+        .menu-col   { padding: <%- _pad %> !important; }
+        /* Nombres de platillo (inline bold) */
+        .menu-col div[style*="font-weight:bold"] { font-size: <%- (8.5 * _fS).toFixed(1) %>px !important; margin-top: 3px; margin-bottom: 1px; }
+    </style>
+    <div class="menu-page-body">
     <div class="menu-grid">
-        <div class="menu-row">
+        <div class="menu-row fixed-row">
             <div class="menu-col text-center font-bold">MENÚ #1</div>
             <div class="menu-col text-center font-bold">MENÚ #2</div>
         </div>
@@ -549,13 +626,14 @@
         </div>
         <% }); %>
 
-        <div class="menu-row" style="min-height:20px; text-align:right;">
-            <div style="padding: 5px 15px; width:100%; font-size:11px;">
+        <div class="menu-row fixed-row" style="text-align:right;">
+            <div style="padding: 4px 15px; width:100%; font-size:10px;">
                 <i>Próxima sesión:</i> &nbsp;&nbsp;&nbsp;&nbsp;<strong><%= plan.proximaSesion ? (() => { const _d = new Date(plan.proximaSesion); const _meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']; const _dd = String(_d.getDate()).padStart(2,'0'); const _mm = _meses[_d.getMonth()]; const _yy = _d.getFullYear(); let _hh = _d.getHours(); const _min = String(_d.getMinutes()).padStart(2,'0'); const _ampm = _hh >= 12 ? 'p.m.' : 'a.m.'; _hh = _hh % 12 || 12; return `${_dd} de ${_mm} de ${_yy} a las ${_hh}:${_min} ${_ampm}`; })() : (meta.proximaSesionTexto || 'Pendiente') %></strong>
             </div>
         </div>
-    </div>
-</div>
+    </div><!-- /menu-grid -->
+    </div><!-- /menu-page-body -->
+</div><!-- /page.menu-page -->
 <% } %>
 
 
@@ -626,27 +704,9 @@
             font-size: 6.8px;
             border: 1px solid #ddd;
         }
-        /* Sección abreviaciones */
+        /* Sección abreviaciones — reutiliza el estilo de .ic-tbl, solo agrega margen */
         .ic-abbr {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 7px;
-            table-layout: fixed;
             margin-top: 3px;
-            page-break-inside: avoid;
-        }
-        .ic-abbr td { border: 1px solid #ddd; padding: 1.5px 3px; vertical-align: top; }
-        .ic-abbr .abbr-hdr {
-            font-weight: bold;
-            background-color: #f2f2f2 !important;
-            -webkit-print-color-adjust: exact !important;
-            print-color-adjust: exact !important;
-            font-size: 7.5px;
-            padding: 2px 3px;
-            text-align: center;
-            text-transform: uppercase;
-            color: #444;
-            border: 1px solid #ddd;
         }
     </style>
 
@@ -764,13 +824,20 @@
     </table>
 
     <!-- ═══ Abreviaciones ═══════════════════════════════════════════════════ -->
-    <table class="ic-abbr">
+    <table class="ic-tbl ic-abbr">
+        <%
+            const abreviaciones = [['IMC','índice de masa corporal'],['MLG','masa libre de grasa'],['Eq','equivalentes'],['AOA','alimentos de origen animal'],['Cdita','cucharadita'],['Cda','cucharada'],['Dn','desnutrición'],['Nr','normal (peso)'],['Sp','sobrepeso'],['Ob','obesidad']];
+            const abbrCols = 3;
+            const abbrRows = Math.ceil(abreviaciones.length / abbrCols);
+        %>
         <tr><td colspan="3" class="ic-title">Abreviaciones</td></tr>
+        <% for (let r = 0; r < abbrRows; r++) { %>
         <tr>
-            <td><strong>IMC:</strong> índice de masa corporal<br><strong>MLG:</strong> masa libre de grasa</td>
-            <td><strong>Eq:</strong> equivalentes<br><strong>AOA:</strong> alimentos de origen animal<br><strong>Cdita:</strong> cucharadita &nbsp; <strong>Cda:</strong> cucharada</td>
-            <td><strong>Dn:</strong> desnutrición<br><strong>Nr:</strong> normal (peso)<br><strong>Sp:</strong> sobrepeso &nbsp; <strong>Ob:</strong> obesidad</td>
+            <% for (let c = 0; c < abbrCols; c++) { const ab = abreviaciones[r * abbrCols + c]; %>
+            <td style="width: <%= (100 / abbrCols).toFixed(0) %>%;"><% if (ab) { %><span style="color: #111; font-weight: 500;"><%= ab[0] %>:</span> <span style="color: #444; font-weight: 400; font-size: 6.8px;"><%= ab[1] %></span><% } %></td>
+            <% } %>
         </tr>
+        <% } %>
     </table>
 </div>
 <% } %>
@@ -829,22 +896,6 @@
         <% } %>
     </table>
 
-    <div class="section-title">Temario abordado:</div>
-    <table style="width: 450px;">
-        <% if (plan.temarioReciente && plan.temarioReciente.length > 0) { %>
-            <% plan.temarioReciente.forEach(tem => { %>
-                <tr><td><strong><%= tem.tema %>:</strong> <%= tem.detalle %></td></tr>
-            <% }); %>
-        <% } else { %>
-            <tr><td>-</td></tr>
-        <% } %>
-    </table>
-
-    <div class="section-title">Notas clínicas:</div>
-    <div style="font-size: 11px; color: #555; background: #f9f9f9; padding: 5px; border-radius: 4px; width: 450px;">
-        <%= plan.notasClinicasRecientes || '-' %>
-    </div>
-
     <% if (meta.estrategiaMaraton && meta.estrategiaMaraton.mostrar !== false) { %>
         <div class="section-title"><span class="highlight-yellow"><%= meta.estrategiaMaraton.titulo || 'Estrategia para 1/2 maraton' %></span></div>
         <table>
@@ -854,6 +905,15 @@
                     <td><%= fila[1] %></td>
                 </tr>
             <% }); %>
+        </table>
+    <% } %>
+
+    <% if (plan.competenciaReciente) { %>
+        <div class="section-title">Notas de competencia:</div>
+        <table style="width: 450px;">
+            <% (['antes', 'durante', 'despues']).forEach(fase => { if (plan.competenciaReciente[fase]) { %>
+                <tr><td style="width: 90px;"><strong><%= fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después' %>:</strong></td><td><%= plan.competenciaReciente[fase] %></td></tr>
+            <% } }); %>
         </table>
     <% } %>
 </div>

@@ -68,10 +68,10 @@ export const getMetricas = async (req, res, next) => {
             prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
             prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
             prisma.plan.count(),
-            prisma.valoracion.count(),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioMes } } }),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioHoy, lte: finHoy } } }),
-            prisma.valoracion.count({ where: { createdAt: { gte: inicioAnio } } }),
+            prisma.valoracion.count({ where: { deletedAt: null } }),
+            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioMes } } }),
+            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioHoy, lte: finHoy } } }),
+            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioAnio } } }),
             prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
             prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
@@ -114,7 +114,7 @@ export const getMetricas = async (req, res, next) => {
         // Batch all 6-month trend queries in one round trip (18 queries → 1)
         const trendQueries = mesesTrend.flatMap(m => [
             prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } }),
-            prisma.valoracion.count({ where: { createdAt: { gte: m.inicio, lte: m.fin } } }),
+            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: m.inicio, lte: m.fin } } }),
             prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } }),
         ]);
         const trendResults = await prisma.$transaction(trendQueries);
@@ -132,6 +132,7 @@ export const getMetricas = async (req, res, next) => {
             include: {
                 antecedentes: { select: { patologia: true } },
                 valoraciones: {
+                    where: { deletedAt: null },
                     orderBy: { fecha: 'desc' },
                     take: 2,
                     select: {
@@ -217,6 +218,7 @@ export const getAlertas = async (req, res, next) => {
                 apellido: true,
                 antecedentes: { select: { patologia: true } },
                 valoraciones: {
+                    where: { deletedAt: null },
                     orderBy: { fecha: 'desc' },
                     select: {
                         id: true,
