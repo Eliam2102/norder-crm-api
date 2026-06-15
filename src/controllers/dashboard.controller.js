@@ -58,52 +58,23 @@ export const getMetricas = async (req, res, next) => {
         const ahora = new Date();
         const { inicioHoy, finHoy, inicioMes, inicioAnio } = getMeridaUtcBoundaries();
 
-        // 1. Data Retrieval — batch all counts in one round trip
-        const [
-            pacientesTotales, pacientesNuevosMes, pacientesNuevosHoy,
-            planesNutricionales, consultasTotales, consultasMes,
-            consultasHoy, consultasAnio, config, basica, premium
-        ] = await prisma.$transaction([
-            prisma.paciente.count(),
-            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
-            prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
-            prisma.plan.count(),
-            prisma.valoracion.count({ where: { deletedAt: null } }),
-            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioMes } } }),
-            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioHoy, lte: finHoy } } }),
-            prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioAnio } } }),
-            prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
-            prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
-            prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
-        ]);
-        const distribucionObjetivos = await prisma.datosEjercicio.groupBy({
-            by: ['objetivo'],
-            _count: { objetivo: true },
-            where: { objetivo: { not: null } }
-        });
-
-        const objetivos = distribucionObjetivos.map(o => ({
-            nombre: o.objetivo,
-            cantidad: o._count.objetivo
-        }));
-
-        // 2. Tendencia Maestre (Last 6 Months)
+        // 1. Tendencia Maestre (Last 6 Months) — build date ranges first
         const ahoraMerida = getMeridaDate();
         const mesesTrend = [];
         const meridaOffsetMs = 6 * 60 * 60 * 1000;
-        
+
         for (let i = 5; i >= 0; i--) {
             const year = ahoraMerida.getFullYear();
             const month = ahoraMerida.getMonth() - i;
-            
+
             const localInicio = new Date(year, month, 1);
             const localFin = new Date(year, month + 1, 0, 23, 59, 59);
-            
+
             const inicio = new Date(localInicio.getTime() + meridaOffsetMs);
             const fin = new Date(localFin.getTime() + meridaOffsetMs);
-            
+
             const mNombre = localInicio.toLocaleString('es-ES', { month: 'short' }).toUpperCase();
-            
+
             mesesTrend.push({
                 nombre: mNombre.replace('.', ''),
                 inicio,
@@ -111,13 +82,53 @@ export const getMetricas = async (req, res, next) => {
             });
         }
 
-        // Batch all 6-month trend queries in one round trip (18 queries → 1)
+        // 2. Single $transaction with ALL 29 count queries (11 summary + 18 trend)
+        //    maxWait/timeout raised to handle slow DB connections gracefully.
         const trendQueries = mesesTrend.flatMap(m => [
             prisma.paciente.count({ where: { fechaRegistro: { gte: m.inicio, lte: m.fin } } }),
             prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: m.inicio, lte: m.fin } } }),
             prisma.plan.count({ where: { fechaCreacion: { gte: m.inicio, lte: m.fin } } }),
         ]);
-        const trendResults = await prisma.$transaction(trendQueries);
+
+        const allCounts = await prisma.$transaction(
+            [
+                prisma.paciente.count(),
+                prisma.paciente.count({ where: { fechaRegistro: { gte: inicioMes } } }),
+                prisma.paciente.count({ where: { fechaRegistro: { gte: inicioHoy, lte: finHoy } } }),
+                prisma.plan.count(),
+                prisma.valoracion.count({ where: { deletedAt: null } }),
+                prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioMes } } }),
+                prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioHoy, lte: finHoy } } }),
+                prisma.valoracion.count({ where: { deletedAt: null, createdAt: { gte: inicioAnio } } }),
+                prisma.configuracion.findUnique({ where: { id: 'singleton' } }),
+                prisma.paciente.count({ where: { nivelMembresia: 'basica' } }),
+                prisma.paciente.count({ where: { nivelMembresia: 'premium' } }),
+                ...trendQueries,
+            ],
+            { maxWait: 8000, timeout: 15000 }
+        );
+
+        const [
+            pacientesTotales, pacientesNuevosMes, pacientesNuevosHoy,
+            planesNutricionales, consultasTotales, consultasMes,
+            consultasHoy, consultasAnio, config, basica, premium,
+            ...trendResults
+        ] = allCounts;
+
+        // Queries that don't need transactional consistency — run concurrently
+        const [distribucionObjetivos] = await Promise.all([
+            prisma.datosEjercicio.groupBy({
+                by: ['objetivo'],
+                _count: { objetivo: true },
+                where: { objetivo: { not: null } }
+            }),
+        ]);
+
+        const objetivos = distribucionObjetivos.map(o => ({
+            nombre: o.objetivo,
+            cantidad: o._count.objetivo
+        }));
+
         const tendenciaMaestre = mesesTrend.map((m, i) => ({
             mes: m.nombre,
             pacientes: trendResults[i * 3],

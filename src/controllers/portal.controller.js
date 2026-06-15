@@ -73,7 +73,7 @@ export const getPlan = async (req, res) => {
         const plan = await prisma.plan.findFirst({
             where: {
                 pacienteId: req.paciente.id,
-                estado: 'activo',
+                estadoEnvio: 'enviado',
             },
             orderBy: { fechaCreacion: 'desc' },
             include: {
@@ -82,7 +82,21 @@ export const getPlan = async (req, res) => {
                     include: {
                         tiemposComida: {
                             orderBy: { orden: 'asc' },
-                            select: { nombre: true, notaPie: true, bebida: true, orden: true }
+                            include: {
+                                ingredientes: {
+                                    orderBy: { orden: 'asc' },
+                                    select: {
+                                        descripcion: true,
+                                        cantidad: true,
+                                        unidad: true,
+                                        eqCantidad: true,
+                                        eqGrupo: true,
+                                        nota: true,
+                                        platillo: true,
+                                        orden: true,
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -112,6 +126,15 @@ export const getPlan = async (req, res) => {
                         nombre: t.nombre,
                         nota: t.notaPie || null,
                         bebida: t.bebida || null,
+                        ingredientes: (t.ingredientes || []).map(i => ({
+                            descripcion: i.descripcion,
+                            cantidad: i.cantidad ? Number(i.cantidad) : null,
+                            unidad: i.unidad || null,
+                            eqCantidad: i.eqCantidad ? Number(i.eqCantidad) : null,
+                            eqGrupo: i.eqGrupo || null,
+                            nota: i.nota || null,
+                            platillo: i.platillo || null,
+                        })),
                     }))
                 }))
             }
@@ -140,7 +163,56 @@ export const getMe = async (req, res) => {
 
         if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
 
-        return res.json(paciente);
+        // Últimas 2 valoraciones para calcular progreso y deltas
+        const ultimasVals = await prisma.valoracion.findMany({
+            where: { pacienteId: req.paciente.id, deletedAt: null },
+            orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
+            take: 2,
+            select: {
+                fecha: true,
+                pesoActual: true,
+                pctGrasaCorp: true,
+                pctGrasa2comp: true,
+                masaMagra: true,
+                masaGrasaReal: true,
+                kgGrasa2comp: true,
+                imc: true,
+            }
+        });
+
+        const toNum = (v) => v != null ? Number(v) : null;
+        const actual   = ultimasVals[0] || null;
+        const anterior = ultimasVals[1] || null;
+
+        const pesoActual       = actual ? toNum(actual.pesoActual) : null;
+        const pctGrasaActual   = actual ? (toNum(actual.pctGrasaCorp) ?? toNum(actual.pctGrasa2comp)) : null;
+        const masaMagraActual  = actual ? toNum(actual.masaMagra) : null;
+        const imcActual        = actual ? toNum(actual.imc) : null;
+        const kgGrasaActual    = actual ? (toNum(actual.masaGrasaReal) ?? toNum(actual.kgGrasa2comp)) : null;
+
+        const pesoAnterior      = anterior ? toNum(anterior.pesoActual) : null;
+        const pctGrasaAnterior  = anterior ? (toNum(anterior.pctGrasaCorp) ?? toNum(anterior.pctGrasa2comp)) : null;
+        const masaMagraAnterior = anterior ? toNum(anterior.masaMagra) : null;
+
+        const delta = anterior ? {
+            peso:     pesoActual      != null && pesoAnterior      != null ? +(pesoActual      - pesoAnterior).toFixed(1)      : null,
+            pctGrasa: pctGrasaActual  != null && pctGrasaAnterior  != null ? +(pctGrasaActual  - pctGrasaAnterior).toFixed(1)  : null,
+            masaMagra:masaMagraActual != null && masaMagraAnterior != null ? +(masaMagraActual - masaMagraAnterior).toFixed(1) : null,
+        } : null;
+
+        return res.json({
+            ...paciente,
+            progreso: {
+                peso:          pesoActual,
+                pctGrasa:      pctGrasaActual,
+                masaMagra:     masaMagraActual,
+                kgGrasa:       kgGrasaActual,
+                imc:           imcActual,
+                fechaUltimaVal: actual?.fecha || null,
+                totalConsultas: ultimasVals.length + (ultimasVals.length > 0 ? 0 : 0), // placeholder for total
+                delta,
+            }
+        });
     } catch (err) {
         console.error('[Portal] getMe error:', err);
         return res.status(500).json({ error: 'Error interno.' });
