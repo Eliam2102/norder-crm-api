@@ -374,66 +374,41 @@ export const guardarResumen = async (req, res) => {
     }
 };
 
-// ─── Actualizar memoria con extracción LLM ────────────────────────────────────
+// ─── Actualizar memoria (N8N hace la extracción, backend solo guarda) ─────────
 
 /**
  * POST /api/agent/actualizar-memoria
- * Body: { telefono, mensajeUsuario, respuestaEyder }
- * N8N llama este endpoint después de responder al paciente.
- * Extrae hechos nuevos con Gemini y actualiza ResumenPaciente.
+ * Body: { telefono, resumen }
+ * N8N extrae los hechos con su propio Gemini y manda el resumen ya procesado.
+ * Este endpoint solo guarda en ResumenPaciente — sin llamadas a Gemini aquí.
  */
 export const actualizarMemoria = async (req, res) => {
     try {
-        const { telefono, mensajeUsuario, respuestaEyder } = req.body;
+        const { telefono, resumen, mensajeUsuario, respuestaEyder } = req.body;
 
-        if (!telefono || !respuestaEyder?.trim()) {
-            return res.status(400).json({ error: 'Se requieren telefono y respuestaEyder.' });
+        // Acepta formato nuevo { resumen } o formato viejo { mensajeUsuario, respuestaEyder }
+        const textoFinal = resumen?.trim() ||
+            (respuestaEyder?.trim()
+                ? `U: ${(mensajeUsuario || '').trim()}\nE: ${respuestaEyder.trim()}`
+                : null);
+
+        if (!telefono || !textoFinal) {
+            return res.status(400).json({ error: 'Se requieren telefono y resumen (o mensajeUsuario+respuestaEyder).' });
         }
 
         const tel = normalizarTelefono(telefono);
         const paciente = await prisma.paciente.findFirst({
             where: { telefono: { endsWith: tel } },
-            select: { id: true, nombre: true }
+            select: { id: true }
         });
 
         if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
 
-        const resumenRecord = await prisma.resumenPaciente.findUnique({
+        await prisma.resumenPaciente.upsert({
             where: { pacienteId: paciente.id },
-            select: { resumen: true }
+            update: { resumen: textoFinal },
+            create: { pacienteId: paciente.id, resumen: textoFinal }
         });
-        const resumenPrevio = resumenRecord?.resumen || '';
-
-        const { GoogleGenerativeAI } = await import('@google/generative-ai');
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' });
-
-        const prompt = `Eres un extractor de memoria clínica para un asistente de nutrición.
-
-Paciente: ${paciente.nombre || 'Paciente'}
-Resumen previo:
-${resumenPrevio || '(ninguno)'}
-
-Último intercambio:
-Usuario: ${mensajeUsuario || '(imagen enviada)'}
-Eyder: ${respuestaEyder}
-
-Tarea:
-1. Extrae SOLO hechos nuevos concretos: alimentos habituales, preferencias, restricciones, intolerancias, metas mencionadas.
-2. Combina con el resumen previo eliminando duplicados.
-3. Si no hay hechos nuevos relevantes, devuelve el resumen previo sin cambios.
-4. Máximo 150 palabras. Sin saludos ni explicaciones.`;
-
-        const result = await model.generateContent(prompt);
-        const nuevoResumen = result.response.text().trim();
-
-        if (nuevoResumen) {
-            await prisma.resumenPaciente.upsert({
-                where: { pacienteId: paciente.id },
-                update: { resumen: nuevoResumen },
-                create: { pacienteId: paciente.id, resumen: nuevoResumen }
-            });
-        }
 
         return res.json({ ok: true });
     } catch (err) {
