@@ -39,6 +39,7 @@ model Paciente {
   barridos         BarridoEquivalencias[]
   citas            Cita[]
   mensajesPortal   MensajePortal[]
+  resumenMemoria   ResumenPaciente?
 
   @@map("paciente")
 }
@@ -576,6 +577,17 @@ model MensajePortal {
 
   @@index([pacienteId, createdAt])
   @@map("mensaje_portal")
+}
+
+model ResumenPaciente {
+  id         String   @id @default(uuid())
+  pacienteId String   @unique @map("paciente_id")
+  resumen    String
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@map("resumen_paciente")
 }
 
 model Cita {

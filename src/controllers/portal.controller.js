@@ -223,13 +223,30 @@ export const getMe = async (req, res) => {
 
 export const getMensajes = async (req, res) => {
     try {
-        const mensajes = await prisma.mensajePortal.findMany({
-            where: { pacienteId: req.paciente.id },
-            orderBy: { createdAt: 'asc' },
-            take: 100,
+        const limite = Math.min(parseInt(req.query.limite) || 30, 50);
+        const cursor = req.query.cursor;
+
+        const where = { pacienteId: req.paciente.id };
+        if (cursor) {
+            where.createdAt = { lt: new Date(cursor) };
+        }
+
+        const rows = await prisma.mensajePortal.findMany({
+            where,
+            orderBy: { createdAt: 'desc' },
+            take: limite + 1,
             select: { id: true, rol: true, contenido: true, tieneImagen: true, createdAt: true },
         });
-        return res.json({ mensajes });
+
+        const hasMore = rows.length > limite;
+        if (hasMore) rows.pop();
+        rows.reverse(); // chronological order
+
+        return res.json({
+            mensajes: rows,
+            hasMore,
+            nextCursor: hasMore ? rows[0].createdAt.toISOString() : null,
+        });
     } catch (err) {
         console.error('[Portal] getMensajes error:', err);
         return res.status(500).json({ error: 'Error al obtener historial.' });
@@ -258,7 +275,7 @@ export const chat = async (req, res) => {
             return res.status(503).json({ error: 'Servicio de chat no disponible temporalmente.' });
         }
 
-        // Guardar mensaje del usuario
+        // Persistir mensaje del usuario en CRM
         await prisma.mensajePortal.create({
             data: {
                 pacienteId: req.paciente.id,
@@ -271,7 +288,7 @@ export const chat = async (req, res) => {
         const { default: axios } = await import('axios');
         const payload = {
             mensaje: mensaje?.trim() || '',
-            Numero_Telefono: contexto.telefono,
+            Numero_Telefono: contexto.paciente?.telefono || contexto.telefono,
         };
         if (imagen_base64) {
             payload.imagen_base64 = imagen_base64;
@@ -286,7 +303,7 @@ export const chat = async (req, res) => {
             (typeof n8nResponse.data === 'string' ? n8nResponse.data : null) ||
             'Sin respuesta del agente.';
 
-        // Guardar respuesta de Eyder
+        // Persistir respuesta de Eyder en CRM
         await prisma.mensajePortal.create({
             data: {
                 pacienteId: req.paciente.id,
@@ -321,9 +338,9 @@ export const activarPortalManual = async (req, res) => {
                 where: { id },
                 select: { nivelMembresia: true, suscripcionFin: true }
             });
-            // Asegurar nivel de membresía
+            // Asegurar nivel de membresía (default: premium)
             if (!nivelMembresia && (!actual?.nivelMembresia || actual.nivelMembresia === 'ninguna')) {
-                data.nivelMembresia = 'norder_health';
+                data.nivelMembresia = 'premium';
             }
             // Si no tiene suscripcionFin o ya venció, poner +1 año por defecto
             const hoy = new Date();

@@ -17,45 +17,83 @@ const normalizarTelefono = (tel) => {
     return tel.replace(/\D/g, '').slice(-10); // Últimos 10 dígitos
 };
 
-/**
- * Serializa el plan activo a texto plano legible por el agente de IA.
- * Formato compacto que minimiza tokens pero conserva toda la información nutricional.
- */
 const planATexto = (plan) => {
     if (!plan) return 'Sin plan nutricional activo.';
 
     const lineas = [
         `PLAN: ${plan.nombre || 'Sin nombre'} | ${plan.calorias} kcal | P:${plan.proteinasPct}% C:${plan.carbohidratosPct}% G:${plan.grasasPct}%`,
+        `Macros: P ${plan.proteinasGr}g | C ${plan.carbohidratosGr}g | G ${plan.grasasGr}g`,
         plan.tipoPlan ? `TIPO: ${plan.tipoPlan}` : null,
-        plan.notasGenerales ? `NOTAS GENERALES: ${plan.notasGenerales}` : null,
+        plan.notasGenerales ? `NOTAS: ${plan.notasGenerales}` : null,
         '',
     ].filter(l => l !== null);
+
+    const esNota = (i) =>
+        typeof i.descripcion === 'string' &&
+        i.descripcion.toLowerCase().startsWith('nota:') &&
+        !i.eqGrupo;
 
     for (const menu of (plan.menus || [])) {
         lineas.push(`=== ${menu.nombre?.toUpperCase() || 'MENÚ'} ===`);
         const tiempos = menu.tiemposComida || menu.tiempos || [];
+
         for (const tiempo of tiempos) {
+            const ings = tiempo.ingredientes || [];
+            const realIngs = ings.filter(i => !esNota(i));
+
+            // Skip tiempos without real ingredients
+            if (realIngs.length === 0) continue;
+
+            // Index pseudo-notes by platillo
+            const notasPorPlatillo = ings.filter(esNota).reduce((acc, n) => {
+                const key = n.platillo || '';
+                if (!acc[key]) acc[key] = [];
+                acc[key].push(n.descripcion.replace(/^nota:\s*/i, '').trim());
+                return acc;
+            }, {});
+
             lineas.push(`\n${tiempo.nombre}:`);
             if (tiempo.nota || tiempo.notaPie) {
                 lineas.push(`  (Nota: ${tiempo.nota || tiempo.notaPie})`);
             }
-            const ings = tiempo.ingredientes || [];
-            if (ings.length === 0) {
-                lineas.push('  - (sin alimentos asignados)');
-            } else {
-                for (const ing of ings) {
-                    let linea = `  - ${ing.descripcion} | ${ing.cantidad} ${ing.unidad}`;
-                    if (ing.eqCantidad && ing.eqGrupo) {
-                        linea += ` → ${ing.eqCantidad} Eq ${ing.eqGrupo}`;
+
+            // Group by platillo
+            const platilloMap = new Map();
+            for (const ing of realIngs) {
+                const key = ing.platillo || '';
+                if (!platilloMap.has(key)) platilloMap.set(key, []);
+                platilloMap.get(key).push(ing);
+            }
+
+            for (const [platillo, platilloIngs] of platilloMap) {
+                const notas = notasPorPlatillo[platillo] || [];
+                if (platillo) {
+                    const notaStr = notas.length > 0 ? ` (${notas.join('; ')})` : '';
+                    lineas.push(`  [${platillo}]${notaStr}`);
+                } else if (notas.length > 0) {
+                    lineas.push(`  (Nota: ${notas.join('; ')})`);
+                }
+
+                for (const ing of platilloIngs) {
+                    const cantidad = parseFloat(ing.cantidad);
+                    if (!cantidad || ing.unidad === '-') {
+                        lineas.push(`  - ${ing.descripcion} (libre)`);
+                        continue;
                     }
-                    if (Array.isArray(ing.equivalencias) && ing.equivalencias.length > 0) {
-                        const extras = ing.equivalencias
-                            .filter(e => e.grupo && e.cantidad)
-                            .map(e => `${e.cantidad} Eq ${e.grupo}`)
-                            .join(' + ');
-                        if (extras) linea += ` + ${extras}`;
+
+                    let linea = `  - ${ing.descripcion} — ${cantidad} ${ing.unidad}`;
+
+                    // Use equivalencias array if present, else scalar fields — never both (avoids duplication)
+                    const eqs = Array.isArray(ing.equivalencias) && ing.equivalencias.length > 0
+                        ? ing.equivalencias.filter(e => e.grupo && e.cantidad)
+                        : (ing.eqCantidad && ing.eqGrupo
+                            ? [{ grupo: ing.eqGrupo, cantidad: ing.eqCantidad }]
+                            : []);
+
+                    if (eqs.length > 0) {
+                        linea += ` | ${eqs.map(e => `${e.cantidad} Eq ${e.grupo}`).join(' + ')}`;
                     }
-                    if (ing.platillo) linea += ` [en: ${ing.platillo}]`;
+
                     if (ing.nota) linea += ` *(${ing.nota})*`;
                     lineas.push(linea);
                 }
@@ -67,42 +105,6 @@ const planATexto = (plan) => {
     return lineas.join('\n');
 };
 
-/**
- * Formatea el plan para respuesta JSON estructurada al agente.
- */
-const formatearPlan = (plan) => {
-    if (!plan) return null;
-    return {
-        id: plan.id,
-        nombre: plan.nombre,
-        tipoPlan: plan.tipoPlan,
-        calorias: plan.calorias,
-        proteinasPct: plan.proteinasPct,
-        carbohidratosPct: plan.carbohidratosPct,
-        grasasPct: plan.grasasPct,
-        proteinasGr: plan.proteinasGr,
-        carbohidratosGr: plan.carbohidratosGr,
-        grasasGr: plan.grasasGr,
-        notasGenerales: plan.notasGenerales,
-        menus: (plan.menus || []).map(m => ({
-            nombre: m.nombre,
-            tiempos: (m.tiemposComida || []).map(t => ({
-                nombre: t.nombre,
-                nota: t.notaPie || t.nota || null,
-                ingredientes: (t.ingredientes || []).map(i => ({
-                    descripcion: i.descripcion,
-                    cantidad: parseFloat(i.cantidad) || 0,
-                    unidad: i.unidad,
-                    eqCantidad: i.eqCantidad ? parseFloat(i.eqCantidad) : null,
-                    eqGrupo: i.eqGrupo || null,
-                    equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
-                    platillo: i.platillo || null,
-                    nota: i.nota || null,
-                }))
-            }))
-        }))
-    };
-};
 
 // ─── Middleware de API Key del Agente ─────────────────────────────────────────
 
@@ -171,10 +173,11 @@ export const getContexto = async (req, res) => {
                 email: true,
                 telefono: true,
                 nivelMembresia: true,
+                portalActivo: true,
                 suscripcionInicio: true,
                 suscripcionFin: true,
                 planes: {
-                    where: { estado: 'activo' },
+                    where: { estadoEnvio: 'enviado' },
                     orderBy: { fechaCreacion: 'desc' },
                     take: 1,
                     include: {
@@ -205,42 +208,68 @@ export const getContexto = async (req, res) => {
             });
         }
 
-        // Verificar membresía activa
-        const hoy = new Date();
-        hoy.setHours(0, 0, 0, 0);
-
-        const tieneNivel = paciente.nivelMembresia && paciente.nivelMembresia !== 'ninguna';
-        const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= hoy;
-        const membresiaActiva = tieneNivel && tieneVigencia;
-
-        if (!membresiaActiva) {
-            let razon = 'sin_membresia';
-            let mensaje = 'No tienes una membresía activa. Contacta a tu nutriólogo para activar tu plan de seguimiento.';
-
-            if (tieneNivel && !tieneVigencia) {
-                razon = 'membresia_vencida';
-                const fechaVenc = new Date(paciente.suscripcionFin).toLocaleDateString('es-MX', {
-                    day: 'numeric', month: 'long', year: 'numeric'
-                });
-                mensaje = `Tu membresía ${paciente.nivelMembresia} venció el ${fechaVenc}. Contacta a tu nutriólogo para renovarla.`;
-            }
-
+        // Verificar acceso portal habilitado por el nutriólogo
+        if (!paciente.portalActivo) {
             return res.status(200).json({
                 acceso: false,
-                razon,
-                mensaje,
+                razon: 'portal_inactivo',
+                mensaje: 'Tu acceso al portal no está habilitado. Contacta a tu nutriólogo.'
+            });
+        }
+
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        const tieneNivel = paciente.nivelMembresia && paciente.nivelMembresia !== 'ninguna';
+        const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= hoy;
+
+        // Tier gratuito — sin membresía de pago activa nunca
+        if (!tieneNivel) {
+            const LIMITE_GRATIS = 5;
+            const mensajesHoy = await prisma.mensajePortal.count({
+                where: { pacienteId: paciente.id, rol: 'user', createdAt: { gte: hoy } }
+            });
+            return res.status(200).json({
+                acceso: true,
+                nivelMembresia: 'gratis',
+                preguntasHoy: mensajesHoy,
+                preguntasRestantes: Math.max(0, LIMITE_GRATIS - mensajesHoy),
+                paciente: {
+                    id: paciente.id,
+                    nombre: `${paciente.nombre} ${paciente.apellido || ''}`.trim(),
+                    telefono: paciente.telefono
+                },
+                planTexto: 'Sin plan activo.',
+                resumen_previo: null,
+            });
+        }
+
+        // Plan de pago vencido
+        if (!tieneVigencia) {
+            const fechaVenc = new Date(paciente.suscripcionFin).toLocaleDateString('es-MX', {
+                day: 'numeric', month: 'long', year: 'numeric'
+            });
+            return res.status(200).json({
+                acceso: false,
+                razon: 'membresia_vencida',
+                mensaje: `Tu membresía ${paciente.nivelMembresia} venció el ${fechaVenc}. Contacta a tu nutriólogo para renovarla.`,
                 suscripcionFin: paciente.suscripcionFin
             });
         }
 
-        // Membresía activa — construir contexto completo
-        const planActivo = paciente.planes[0] || null;
-        const planFormateado = formatearPlan(planActivo);
-        const planTexto = planATexto(planActivo);
+        // Membresía de pago activa
+        const esPremium = ['premium', 'norder_health'].includes(paciente.nivelMembresia);
+        const planActivo = esPremium ? (paciente.planes[0] || null) : null;
+        const planTexto = esPremium ? planATexto(planActivo) : 'Sin plan activo.';
+
+        const resumenRecord = await prisma.resumenPaciente.findUnique({
+            where: { pacienteId: paciente.id },
+            select: { resumen: true, updatedAt: true }
+        });
 
         return res.status(200).json({
             acceso: true,
             nivelMembresia: paciente.nivelMembresia,
+            esPremium,
             suscripcionInicio: paciente.suscripcionInicio,
             suscripcionFin: paciente.suscripcionFin,
             paciente: {
@@ -252,8 +281,8 @@ export const getContexto = async (req, res) => {
                 telefono: paciente.telefono
             },
             tienePlan: !!planActivo,
-            plan: planFormateado,
-            planTexto   // Para inyectar directamente en el system prompt del agente
+            planTexto,
+            resumen_previo: resumenRecord?.resumen || null,
         });
 
     } catch (err) {
@@ -263,5 +292,152 @@ export const getContexto = async (req, res) => {
             razon: 'error_interno',
             mensaje: 'Ocurrió un error al consultar tu información. Intenta de nuevo.'
         });
+    }
+};
+
+// ─── Historial reciente ───────────────────────────────────────────────────────
+
+/**
+ * GET /api/agent/historial?telefono=XXX&limite=20
+ * Devuelve los últimos N mensajes del paciente para contexto histórico del agente.
+ */
+export const getHistorial = async (req, res) => {
+    try {
+        const { telefono } = req.query;
+        const limite = Math.min(parseInt(req.query.limite) || 20, 50);
+
+        if (!telefono) {
+            return res.status(400).json({ error: 'Se requiere "telefono".' });
+        }
+
+        const tel = normalizarTelefono(telefono);
+        const paciente = await prisma.paciente.findFirst({
+            where: { telefono: { endsWith: tel } },
+            select: { id: true }
+        });
+
+        if (!paciente) return res.json({ historial: [] });
+
+        const mensajes = await prisma.mensajePortal.findMany({
+            where: { pacienteId: paciente.id },
+            orderBy: { createdAt: 'desc' },
+            take: limite,
+            select: { rol: true, contenido: true, createdAt: true }
+        });
+
+        return res.json({
+            historial: mensajes.reverse().map(m => ({
+                rol: m.rol,
+                contenido: m.contenido,
+                fecha: m.createdAt.toISOString(),
+            }))
+        });
+    } catch (err) {
+        console.error('[AgentController] getHistorial error:', err);
+        return res.status(500).json({ error: 'Error al obtener historial.' });
+    }
+};
+
+// ─── Guardar resumen de memoria ───────────────────────────────────────────────
+
+/**
+ * POST /api/agent/guardar-resumen
+ * Body: { telefono: string, resumen: string }
+ * N8N llama este endpoint después de cada intercambio para persistir los hechos extraídos.
+ */
+export const guardarResumen = async (req, res) => {
+    try {
+        const { telefono, resumen } = req.body;
+
+        if (!telefono || !resumen?.trim()) {
+            return res.status(400).json({ error: 'Se requieren "telefono" y "resumen".' });
+        }
+
+        const tel = normalizarTelefono(telefono);
+        const paciente = await prisma.paciente.findFirst({
+            where: { telefono: { endsWith: tel } },
+            select: { id: true }
+        });
+
+        if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
+
+        await prisma.resumenPaciente.upsert({
+            where: { pacienteId: paciente.id },
+            update: { resumen: resumen.trim() },
+            create: { pacienteId: paciente.id, resumen: resumen.trim() },
+        });
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('[AgentController] guardarResumen error:', err);
+        return res.status(500).json({ error: 'Error al guardar resumen.' });
+    }
+};
+
+// ─── Actualizar memoria con extracción LLM ────────────────────────────────────
+
+/**
+ * POST /api/agent/actualizar-memoria
+ * Body: { telefono, mensajeUsuario, respuestaEyder }
+ * N8N llama este endpoint después de responder al paciente.
+ * Extrae hechos nuevos con Gemini y actualiza ResumenPaciente.
+ */
+export const actualizarMemoria = async (req, res) => {
+    try {
+        const { telefono, mensajeUsuario, respuestaEyder } = req.body;
+
+        if (!telefono || !respuestaEyder?.trim()) {
+            return res.status(400).json({ error: 'Se requieren telefono y respuestaEyder.' });
+        }
+
+        const tel = normalizarTelefono(telefono);
+        const paciente = await prisma.paciente.findFirst({
+            where: { telefono: { endsWith: tel } },
+            select: { id: true, nombre: true }
+        });
+
+        if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
+
+        const resumenRecord = await prisma.resumenPaciente.findUnique({
+            where: { pacienteId: paciente.id },
+            select: { resumen: true }
+        });
+        const resumenPrevio = resumenRecord?.resumen || '';
+
+        const { GoogleGenerativeAI } = await import('@google/generative-ai');
+        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+        const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.0-flash' });
+
+        const prompt = `Eres un extractor de memoria clínica para un asistente de nutrición.
+
+Paciente: ${paciente.nombre || 'Paciente'}
+Resumen previo:
+${resumenPrevio || '(ninguno)'}
+
+Último intercambio:
+Usuario: ${mensajeUsuario || '(imagen enviada)'}
+Eyder: ${respuestaEyder}
+
+Tarea:
+1. Extrae SOLO hechos nuevos concretos: alimentos habituales, preferencias, restricciones, intolerancias, metas mencionadas.
+2. Combina con el resumen previo eliminando duplicados.
+3. Si no hay hechos nuevos relevantes, devuelve el resumen previo sin cambios.
+4. Máximo 150 palabras. Sin saludos ni explicaciones.`;
+
+        const result = await model.generateContent(prompt);
+        const nuevoResumen = result.response.text().trim();
+
+        if (nuevoResumen) {
+            await prisma.resumenPaciente.upsert({
+                where: { pacienteId: paciente.id },
+                update: { resumen: nuevoResumen },
+                create: { pacienteId: paciente.id, resumen: nuevoResumen }
+            });
+        }
+
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('[AgentController] actualizarMemoria error:', err);
+        return res.status(500).json({ error: 'Error al actualizar memoria.' });
     }
 };
