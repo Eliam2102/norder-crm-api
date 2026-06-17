@@ -200,8 +200,21 @@ export const getMe = async (req, res) => {
             masaMagra:masaMagraActual != null && masaMagraAnterior != null ? +(masaMagraActual - masaMagraAnterior).toFixed(1) : null,
         } : null;
 
+        // Tier gratuito: contar preguntas usadas hoy
+        let gratisInfo = {};
+        const esTierGratis = !paciente.nivelMembresia || paciente.nivelMembresia === 'ninguna';
+        if (esTierGratis) {
+            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+            const LIMITE = 5;
+            const preguntasHoy = await prisma.mensajePortal.count({
+                where: { pacienteId: req.paciente.id, rol: 'user', createdAt: { gte: hoy } }
+            });
+            gratisInfo = { preguntasHoy, preguntasRestantes: Math.max(0, LIMITE - preguntasHoy), limiteGratis: LIMITE };
+        }
+
         return res.json({
             ...paciente,
+            ...gratisInfo,
             progreso: {
                 peso:          pesoActual,
                 pctGrasa:      pctGrasaActual,
@@ -209,7 +222,6 @@ export const getMe = async (req, res) => {
                 kgGrasa:       kgGrasaActual,
                 imc:           imcActual,
                 fechaUltimaVal: actual?.fecha || null,
-                totalConsultas: ultimasVals.length + (ultimasVals.length > 0 ? 0 : 0), // placeholder for total
                 delta,
             }
         });
@@ -294,7 +306,7 @@ export const chat = async (req, res) => {
             payload.imagen_base64 = imagen_base64;
         }
 
-        const n8nResponse = await axios.post(webhookUrl, payload, { timeout: 60_000 });
+        const n8nResponse = await axios.post(webhookUrl, payload, { timeout: 180_000 });
 
         const respuesta =
             n8nResponse.data?.output ||
