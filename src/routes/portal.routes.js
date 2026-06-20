@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { loginPortal, getMe, getPlan, getMensajes, chat, activarPortalManual } from '../controllers/portal.controller.js';
+import { loginPortal, getMe, getPlan, getMensajes, chat, crearCheckout, activarPortalManual } from '../controllers/portal.controller.js';
 import { portalAuthMiddleware } from '../middlewares/portalAuth.middleware.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 
@@ -30,6 +30,7 @@ router.get('/me', portalAuthMiddleware, getMe);
 router.get('/plan', portalAuthMiddleware, getPlan);
 router.get('/mensajes', portalAuthMiddleware, getMensajes);
 router.post('/chat', portalAuthMiddleware, chatLimiter, chat);
+router.post('/checkout', portalAuthMiddleware, crearCheckout);
 router.put('/activar/:id', authMiddleware, activarPortalManual);
 
 export default router;

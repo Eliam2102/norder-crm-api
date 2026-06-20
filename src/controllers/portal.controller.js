@@ -1,6 +1,9 @@
 import jwt from 'jsonwebtoken';
+import Stripe from 'stripe';
 import prisma from '../lib/prisma.js';
-import { normalizarTelefono, getContextoPaciente } from '../lib/pacienteContext.js';
+import { normalizarTelefono, getContextoPaciente, hoyMexicoCity } from '../lib/pacienteContext.js';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -204,10 +207,9 @@ export const getMe = async (req, res) => {
         let gratisInfo = {};
         const esTierGratis = !paciente.nivelMembresia || paciente.nivelMembresia === 'ninguna';
         if (esTierGratis) {
-            const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
             const LIMITE = 5;
             const preguntasHoy = await prisma.mensajePortal.count({
-                where: { pacienteId: req.paciente.id, rol: 'user', createdAt: { gte: hoy } }
+                where: { pacienteId: req.paciente.id, rol: 'user', createdAt: { gte: hoyMexicoCity() } }
             });
             gratisInfo = { preguntasHoy, preguntasRestantes: Math.max(0, LIMITE - preguntasHoy), limiteGratis: LIMITE };
         }
@@ -301,6 +303,9 @@ export const chat = async (req, res) => {
         const payload = {
             mensaje: mensaje?.trim() || '',
             Numero_Telefono: contexto.paciente?.telefono || contexto.telefono,
+            nivelMembresia: contexto.nivelMembresia || 'ninguna',
+            planTexto: contexto.planTexto || '',
+            tienePlan: !!contexto.tienePlan,
         };
         if (imagen_base64) {
             payload.imagen_base64 = imagen_base64;
@@ -325,13 +330,75 @@ export const chat = async (req, res) => {
             },
         });
 
-        return res.json({ respuesta });
+        // Retornar preguntas restantes para tier gratis (para actualizar UI sin re-fetch)
+        let chatExtra = {};
+        const esGratis = !contexto.nivelMembresia || contexto.nivelMembresia === 'ninguna' || contexto.nivelMembresia === 'gratis';
+        if (esGratis) {
+            const LIMITE = 5;
+            const preguntasHoy = await prisma.mensajePortal.count({
+                where: { pacienteId: req.paciente.id, rol: 'user', createdAt: { gte: hoyMexicoCity() } }
+            });
+            chatExtra = { preguntasRestantes: Math.max(0, LIMITE - preguntasHoy), limiteGratis: LIMITE };
+        }
+
+        return res.json({ respuesta, ...chatExtra });
     } catch (err) {
         if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
             return res.status(504).json({ error: 'El agente tardó demasiado en responder. Intenta de nuevo.' });
         }
         console.error('[Portal] chat error:', err);
         return res.status(500).json({ error: 'Error al comunicarse con el agente.' });
+    }
+};
+
+// ─── Checkout Stripe ──────────────────────────────────────────────────────────
+
+export const crearCheckout = async (req, res) => {
+    try {
+        const { nivel } = req.body;
+
+        const priceMap = {
+            basica: process.env.STRIPE_PRICE_BASICA,
+            premium: process.env.STRIPE_PRICE_PREMIUM,
+        };
+
+        const priceId = priceMap[nivel];
+        if (!priceId) {
+            return res.status(400).json({ error: 'Nivel inválido. Usa "basica" o "premium".' });
+        }
+
+        const paciente = await prisma.paciente.findUnique({
+            where: { id: req.paciente.id },
+            select: { telefono: true, email: true, nombre: true, apellido: true }
+        });
+
+        if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
+
+        const urls = (process.env.FRONTEND_URL || 'http://localhost:8080').split(',').map(u => u.trim());
+        const isProd = process.env.NODE_ENV === 'production';
+        const frontendBase = isProd
+            ? (urls.find(u => !u.includes('localhost')) ?? urls[0])
+            : (urls.find(u => u.includes('8080')) ?? urls.find(u => u.includes('localhost')) ?? urls[0]);
+
+        const session = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            payment_method_types: ['card'],
+            line_items: [{ price: priceId, quantity: 1 }],
+            metadata: {
+                pacienteId: req.paciente.id,
+                telefono: paciente.telefono || '',
+                email: paciente.email || '',
+                nivel,
+            },
+            customer_email: paciente.email || undefined,
+            success_url: `${frontendBase}/norder-health/activado?nivel=${nivel}`,
+            cancel_url: `${frontendBase}/norder-health/cancelado`,
+        });
+
+        return res.json({ url: session.url });
+    } catch (err) {
+        console.error('[Portal] crearCheckout error:', err);
+        return res.status(500).json({ error: 'Error al crear sesión de pago.' });
     }
 };
 
@@ -350,9 +417,9 @@ export const activarPortalManual = async (req, res) => {
                 where: { id },
                 select: { nivelMembresia: true, suscripcionFin: true }
             });
-            // Asegurar nivel de membresía (default: premium)
-            if (!nivelMembresia && (!actual?.nivelMembresia || actual.nivelMembresia === 'ninguna')) {
-                data.nivelMembresia = 'premium';
+            // Si no se especifica nivel y el paciente no tenía ninguno, dejar en 'ninguna' (gratis)
+            if (!nivelMembresia && !actual?.nivelMembresia) {
+                data.nivelMembresia = 'ninguna';
             }
             // Si no tiene suscripcionFin o ya venció, poner +1 año por defecto
             const hoy = new Date();

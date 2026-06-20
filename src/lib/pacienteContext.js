@@ -5,6 +5,19 @@ export const normalizarTelefono = (tel) => {
     return tel.replace(/\D/g, '').slice(-10);
 };
 
+// Retorna el inicio del día actual en hora de México (maneja CST/CDT automáticamente)
+export const hoyMexicoCity = () => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('sv-SE', { timeZone: 'America/Mexico_City' });
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const noon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+    const mxNoonHour = parseInt(
+        new Intl.DateTimeFormat('en', { timeZone: 'America/Mexico_City', hour: 'numeric', hour12: false }).format(noon)
+    );
+    const offset = mxNoonHour - 12; // -5 (CDT verano) o -6 (CST invierno)
+    return new Date(Date.UTC(y, m - 1, d, -offset, 0, 0, 0));
+};
+
 const calcularEdad = (fechaNacimiento) => {
     if (!fechaNacimiento) return null;
     const hoy = new Date();
@@ -162,16 +175,16 @@ export const getContextoPaciente = async ({ telefono, email, pacienteId }) => {
         };
     }
 
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const inicioDiaHoy = hoyMexicoCity();
     const tieneNivel = paciente.nivelMembresia && paciente.nivelMembresia !== 'ninguna';
-    const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= hoy;
+    const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= inicioDiaHoy;
 
     // Tier gratuito: sin plan de pago nunca activado
     if (!tieneNivel) {
         const LIMITE_GRATIS = 5;
+        const inicioDia = hoyMexicoCity();
         const mensajesHoy = await prisma.mensajePortal.count({
-            where: { pacienteId: paciente.id, rol: 'user', createdAt: { gte: hoy } }
+            where: { pacienteId: paciente.id, rol: 'user', createdAt: { gte: inicioDia } }
         });
         if (mensajesHoy >= LIMITE_GRATIS) {
             return {

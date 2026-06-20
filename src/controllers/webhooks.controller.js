@@ -19,12 +19,15 @@ export const stripeWebhook = async (req, res) => {
         if (event.type === 'checkout.session.completed' || event.type === 'customer.subscription.created') {
             const session = event.data.object;
 
-            // Extraer identificador del paciente: metadata.telefono > metadata.email > customer_email
+            // Identificar paciente: pacienteId (metadata) > telefono > email
+            const pacienteIdMeta = session.metadata?.pacienteId;
             const telefono = session.metadata?.telefono;
             const email = session.metadata?.email || session.customer_email;
 
             let where = null;
-            if (telefono) {
+            if (pacienteIdMeta) {
+                where = { id: pacienteIdMeta };
+            } else if (telefono) {
                 const tel = normalizarTelefono(telefono);
                 where = { telefono: { endsWith: tel } };
             } else if (email) {
@@ -38,8 +41,28 @@ export const stripeWebhook = async (req, res) => {
 
             const paciente = await prisma.paciente.findFirst({ where, select: { id: true } });
             if (!paciente) {
-                console.warn('[Webhook] Paciente no encontrado para identificador:', telefono || email);
+                console.warn('[Webhook] Paciente no encontrado para identificador:', pacienteIdMeta || telefono || email);
                 return res.status(200).json({ received: true });
+            }
+
+            // Determinar nivel de membresía según el price pagado
+            const priceBasica = process.env.STRIPE_PRICE_BASICA;
+            const pricePremium = process.env.STRIPE_PRICE_PREMIUM;
+            let nivelMembresia = session.metadata?.nivel || 'premium'; // metadata tiene prioridad
+
+            if (!session.metadata?.nivel) {
+                // Detectar por price_id de la suscripción o pago único
+                let priceId = null;
+                if (session.subscription) {
+                    try {
+                        const sub = await stripe.subscriptions.retrieve(session.subscription);
+                        priceId = sub.items?.data?.[0]?.price?.id;
+                    } catch {}
+                }
+                if (!priceId) priceId = session.line_items?.data?.[0]?.price?.id;
+
+                if (priceId === priceBasica) nivelMembresia = 'basica';
+                else if (priceId === pricePremium) nivelMembresia = 'premium';
             }
 
             // Determinar fecha de fin de suscripción
@@ -61,14 +84,14 @@ export const stripeWebhook = async (req, res) => {
                 where: { id: paciente.id },
                 data: {
                     portalActivo: true,
-                    nivelMembresia: 'norder_health',
+                    nivelMembresia,
                     suscripcionInicio: new Date(),
                     suscripcionFin,
                     suscripcionIdExterno: session.subscription || session.payment_intent || null,
                 }
             });
 
-            console.log(`[Webhook] Portal activado para paciente ${paciente.id} hasta ${suscripcionFin.toISOString()}`);
+            console.log(`[Webhook] Portal activado para paciente ${paciente.id} — nivel: ${nivelMembresia} — hasta ${suscripcionFin.toISOString()}`);
         }
     } catch (err) {
         // Siempre 200 — Stripe reintenta si recibe otro código
