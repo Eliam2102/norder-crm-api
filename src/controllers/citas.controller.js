@@ -4,6 +4,9 @@ import axios from 'axios';
 
 const CALCOM_API_URL = 'https://api.cal.com/v2';
 const CALCOM_API_VERSION = '2024-08-13';
+// Los event types son del equipo "NORDER Health" (team slug: norder-health).
+// Los team event types NO requieren el param 'username' — usan su propio scope.
+
 
 export const getSlots = async (req, res) => {
   try {
@@ -19,6 +22,8 @@ export const getSlots = async (req, res) => {
         startTime: startTime,
         endTime: endTime,
         timeZone: 'America/Merida',
+        // Los event types son de equipo (NORDER Health) — no se pasa username
+        // individual ya que el equipo tiene su propio calendario compartido.
       },
       headers: {
         Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
