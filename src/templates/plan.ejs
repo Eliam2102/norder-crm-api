@@ -880,9 +880,16 @@
 
     <div class="section-title">Esquema de hidratación:</div>
     <table style="width: 250px;">
-        <% (plan.hidratacionReciente || meta.hidratacion || ["-", "-"]).forEach(hid => { %>
-            <tr><td><%= hid %></td></tr>
-        <% }); %>
+        <% if (plan.esqueHidratacionReciente) { %>
+            <tr><td style="white-space: pre-wrap;"><%= plan.esqueHidratacionReciente %></td></tr>
+            <% if (plan.hidratacionReciente && plan.hidratacionReciente.length > 0) { %>
+                <tr><td style="color: #888; font-size: 0.85em;">Referencia expediente: <%= plan.hidratacionReciente[0] %></td></tr>
+            <% } %>
+        <% } else { %>
+            <% (plan.hidratacionReciente || meta.hidratacion || ["-"]).forEach(hid => { %>
+                <tr><td><%= hid %></td></tr>
+            <% }); %>
+        <% } %>
     </table>
 
     <div class="section-title">Alimentos a evitar:</div>

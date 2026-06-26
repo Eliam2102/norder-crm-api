@@ -874,6 +874,20 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         plan.evitarReciente = [antecedentes.alimentosNoGustan];
     }
 
+    // Hidratación: priorizar esqueHidratacion de la valoración asociada al plan,
+    // luego el de la valoración más reciente, y antecedentes.agua como dato de expediente.
+    let esqueHidratacionVal = null;
+    if (plan.valoracionId) {
+        const valConHidrat = await prisma.valoracion.findUnique({
+            where: { id: plan.valoracionId },
+            select: { esqueHidratacion: true }
+        });
+        esqueHidratacionVal = valConHidrat?.esqueHidratacion || null;
+    }
+    if (!esqueHidratacionVal && ultimaVal?.esqueHidratacion) {
+        esqueHidratacionVal = ultimaVal.esqueHidratacion;
+    }
+    plan.esqueHidratacionReciente = esqueHidratacionVal || null;
     plan.hidratacionReciente = antecedentes?.agua ? [antecedentes.agua] : [];
 
     plan.alimentosPersonales = [];

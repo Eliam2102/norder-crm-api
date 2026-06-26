@@ -215,6 +215,7 @@ model Valoracion {
   // Notas
   comentarios             String?
   notasLibres             String?  @map("notas_libres")
+  esqueHidratacion        String?  @map("esche_hidratacion")
   adjuntosJson            Json?    @map("adjuntos_json")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
