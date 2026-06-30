@@ -206,7 +206,7 @@ export const create = async (req, res, next) => {
             include: {
                 datosEjercicio: true,
                 antecedentes: true,
-                consumoCalorico: true
+                habitosAlimentarios: { orderBy: { orden: 'asc' } }
             }
         });
 
@@ -223,7 +223,7 @@ export const getById = async (req, res, next) => {
             where: { id },
             include: {
                 datosEjercicio: true,
-                consumoCalorico: true,
+                habitosAlimentarios: { orderBy: { orden: 'asc' } },
                 antecedentes: true,
                 valoraciones: { 
                     where: { deletedAt: null },
@@ -242,7 +242,7 @@ export const getById = async (req, res, next) => {
             }
         });
 
-        const { datosEjercicio: de, consumoCalorico: cc, antecedentes: ant, valoraciones: val, ...rest } = paciente;
+        const { datosEjercicio: de, habitosAlimentarios: ha, antecedentes: ant, valoraciones: val, ...rest } = paciente;
         
         // Mapeo de valoraciones con lógica de estados de flujo
         const valoracionesMapped = val.map(v => {
@@ -278,9 +278,17 @@ export const getById = async (req, res, next) => {
             };
         });
 
+        // Default 5 habitos if none exist
+        const DEFAULT_HABITOS = [
+            { label: 'Desayuno', hora: '', ayer: '', usualmente: '' },
+            { label: 'Colación', hora: '', ayer: '', usualmente: '' },
+            { label: 'Comida',   hora: '', ayer: '', usualmente: '' },
+            { label: 'Colación', hora: '', ayer: '', usualmente: '' },
+            { label: 'Cena',     hora: '', ayer: '', usualmente: '' },
+        ];
+
         const mapped = { 
             ...rest,
-            // Reconstrucción de la estructura original
             ejercicio: de ? {
                 ...de,
                 objetivo: de.objetivo,
@@ -309,34 +317,10 @@ export const getById = async (req, res, next) => {
                 suplementosDetalle: ant.suplementosDetalle ?? [],
                 farmacosDetalle: ant.farmacosDetalle ?? []
             } : {},
-            habitos: cc ? {
-                ...cc,
-                desayuno: {
-                    hora: cc.horaDesayuno,
-                    ayer: cc.ayerDesayuno,
-                    usualmente: cc.usalmenteDesayuno
-                },
-                colacion1: {
-                    hora: cc.horaColacion1,
-                    ayer: cc.ayerColacion1,
-                    usualmente: cc.usalmenteColacion1
-                },
-                almuerzo: {
-                    hora: cc.horaAlmuerzo,
-                    ayer: cc.ayerAlmuerzo,
-                    usualmente: cc.usalmenteAlmuerzo
-                },
-                colacion2: {
-                    hora: cc.horaColacion2,
-                    ayer: cc.ayerColacion2,
-                    usualmente: cc.usalmenteColacion2
-                },
-                cena: {
-                    hora: cc.horaCena,
-                    ayer: cc.ayerCena,
-                    usualmente: cc.usalmenteCena
-                }
-            } : {},
+            // Return habitos as array (new dynamic format)
+            habitos: (ha && ha.length > 0)
+                ? ha.map(({ id: _id, pacienteId: _pid, orden: _o, ...fields }) => fields)
+                : DEFAULT_HABITOS,
             valoraciones: valoracionesMapped,
             ultimaValoracion: valoracionesMapped[0] || null
         };
@@ -490,53 +474,34 @@ export const update = async (req, res, next) => {
                         }
                     }
                 } : undefined,
-                consumoCalorico: c24 ? {
-                    upsert: {
-                        update: {
-                            recordatorio24hActivo: c24.recordatorio24hActivo ?? true,
-                            horaDesayuno:     c24.desayuno?.hora ?? c24.horaDesayuno,
-                            ayerDesayuno:     c24.desayuno?.ayer ?? c24.ayerDesayuno,
-                            usalmenteDesayuno: c24.desayuno?.usualmente ?? c24.usalmenteDesayuno,
-                            horaColacion1:    c24.colacion1?.hora ?? c24.horaColacion1,
-                            ayerColacion1:    c24.colacion1?.ayer ?? c24.ayerColacion1,
-                            usalmenteColacion1: c24.colacion1?.usualmente ?? c24.usalmenteColacion1,
-                            horaAlmuerzo:     c24.almuerzo?.hora ?? c24.horaAlmuerzo,
-                            ayerAlmuerzo:     c24.almuerzo?.ayer ?? c24.ayerAlmuerzo,
-                            usalmenteAlmuerzo: c24.almuerzo?.usualmente ?? c24.usalmenteAlmuerzo,
-                            horaColacion2:    c24.colacion2?.hora ?? c24.horaColacion2,
-                            ayerColacion2:    c24.colacion2?.ayer ?? c24.ayerColacion2,
-                            usalmenteColacion2: c24.colacion2?.usualmente ?? c24.usalmenteColacion2,
-                            horaCena:         c24.cena?.hora ?? c24.horaCena,
-                            ayerCena:         c24.cena?.ayer ?? c24.ayerCena,
-                            usalmenteCena:     c24.cena?.usualmente ?? c24.usalmenteCena
-                        },
-                        create: {
-                            recordatorio24hActivo: c24.recordatorio24hActivo ?? true,
-                            horaDesayuno:     c24.desayuno?.hora ?? c24.horaDesayuno,
-                            ayerDesayuno:     c24.desayuno?.ayer ?? c24.ayerDesayuno,
-                            usalmenteDesayuno: c24.desayuno?.usualmente ?? c24.usalmenteDesayuno,
-                            horaColacion1:    c24.colacion1?.hora ?? c24.horaColacion1,
-                            ayerColacion1:    c24.colacion1?.ayer ?? c24.ayerColacion1,
-                            usalmenteColacion1: c24.colacion1?.usualmente ?? c24.usalmenteColacion1,
-                            horaAlmuerzo:     c24.almuerzo?.hora ?? c24.horaAlmuerzo,
-                            ayerAlmuerzo:     c24.almuerzo?.ayer ?? c24.ayerAlmuerzo,
-                            usalmenteAlmuerzo: c24.almuerzo?.usualmente ?? c24.usalmenteAlmuerzo,
-                            horaColacion2:    c24.colacion2?.hora ?? c24.horaColacion2,
-                            ayerColacion2:    c24.colacion2?.ayer ?? c24.ayerColacion2,
-                            usalmenteColacion2: c24.colacion2?.usualmente ?? c24.usalmenteColacion2,
-                            horaCena:         c24.cena?.hora ?? c24.horaCena,
-                            ayerCena:         c24.cena?.ayer ?? c24.ayerCena,
-                            usalmenteCena:     c24.cena?.usualmente ?? c24.usalmenteCena
-                        }
-                    }
-                } : undefined
             },
             include: {
                 datosEjercicio: true,
                 antecedentes: true,
-                consumoCalorico: true
+                habitosAlimentarios: { orderBy: { orden: 'asc' } }
             }
         });
+
+        // Save habitos as dynamic rows (separate operation: deleteMany + createMany)
+        if (habitos !== undefined) {
+            const rows = Array.isArray(habitos) ? habitos : [];
+            await prisma.habitoAlimentario.deleteMany({ where: { pacienteId: id } });
+            if (rows.length > 0) {
+                const { randomUUID } = await import('crypto');
+                await prisma.habitoAlimentario.createMany({
+                    data: rows.map((r, idx) => ({
+                        id: randomUUID(),
+                        pacienteId: id,
+                        orden: idx,
+                        label: r.label || 'Tiempo',
+                        hora: r.hora || '',
+                        ayer: r.ayer || '',
+                        usualmente: r.usualmente || '',
+                    }))
+                });
+            }
+        }
+
         return ok(res, updated);
     } catch (err) {
         next(err);
@@ -614,10 +579,11 @@ export const upsertAntecedentes = async (req, res, next) => {
 
 export const getConsumo = async (req, res, next) => {
     try {
-        const data = await prisma.consumoCalorico.findUnique({
-            where: { pacienteId: req.params.id }
+        const data = await prisma.habitoAlimentario.findMany({
+            where: { pacienteId: req.params.id },
+            orderBy: { orden: 'asc' }
         });
-        return ok(res, data || {});
+        return ok(res, data || []);
     } catch (err) {
         next(err);
     }
@@ -625,11 +591,28 @@ export const getConsumo = async (req, res, next) => {
 
 export const upsertConsumo = async (req, res, next) => {
     try {
-        const data = await prisma.consumoCalorico.upsert({
-            where: { pacienteId: req.params.id },
-            update: req.body,
-            create: { ...req.body, pacienteId: req.params.id }
-        });
+        const habitos = Array.isArray(req.body) ? req.body : [];
+        await prisma.habitoAlimentario.deleteMany({ where: { pacienteId: req.params.id } });
+        
+        let data = [];
+        if (habitos.length > 0) {
+            const { randomUUID } = await import('crypto');
+            await prisma.habitoAlimentario.createMany({
+                data: habitos.map((r, idx) => ({
+                    id: randomUUID(),
+                    pacienteId: req.params.id,
+                    orden: idx,
+                    label: r.label || 'Tiempo',
+                    hora: r.hora || '',
+                    ayer: r.ayer || '',
+                    usualmente: r.usualmente || '',
+                }))
+            });
+            data = await prisma.habitoAlimentario.findMany({
+                where: { pacienteId: req.params.id },
+                orderBy: { orden: 'asc' }
+            });
+        }
         return ok(res, data);
     } catch (err) {
         next(err);

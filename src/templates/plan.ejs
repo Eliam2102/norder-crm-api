@@ -848,6 +848,90 @@
 <div class="page">
     <%- headerHTML %>
     
+    <% if (meta.showDistribucionPorciones !== false && plan.menus && plan.menus.length > 0) { %>
+        <div class="section-title" style="margin-bottom: 15px;">Distribución de porciones en el día</div>
+        <div style="display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap;">
+            <% plan.menus.forEach(menu => { %>
+                <div style="border: 1px solid #000; width: calc(50% - 10px); box-sizing: border-box; margin-bottom: 10px;">
+                    <div style="text-align: center; font-weight: 800; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #000;">
+                        <%= menu.nombre %>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                        <thead>
+                            <tr>
+                                <th style="border: none; border-bottom: 1px solid #000; border-right: 1px solid #000; text-align: left; padding: 4px 8px; font-weight: bold; background: transparent;">ALIMENTOS</th>
+                                <th style="border: none; border-bottom: 1px solid #000; text-align: left; padding: 4px 8px; font-weight: bold; background: transparent;">PORCIONES</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <% 
+                               const mapGroupToLabel = (g) => {
+                                 const low = (g || '').toLowerCase();
+                                 if (low.includes('fruta')) return 'Frutas';
+                                 if (low === 'c y t sin grasa' || low === 'cereal sin grasa' || low.includes('cereal s/grasa')) return 'Cereal sin grasa';
+                                 if (low === 'c y t con grasa' || low === 'cereal con grasa' || low.includes('cereal c/grasa')) return 'Cereal con grasa';
+                                 if (low.includes('leguminosa')) return 'Leguminosas';
+                                 if (low === 'aoa muy bajo' || low.includes('muy bajo')) return 'AOA mb';
+                                 if (low === 'aoa bajo' || (low.includes('aoa') && low.includes('bajo') && !low.includes('muy'))) return 'AOA b';
+                                 if (low === 'aoa moderado' || low.includes('moderado')) return 'AOA moderado';
+                                 if (low === 'aoa alto' || (low.includes('aoa') && low.includes('alto'))) return 'AOA alto';
+                                 if (low.includes('leche')) return 'Leche';
+                                 if (low === 'a y g sin proteína' || low === 'grasa sin proteína' || low.includes('grasa s/prot')) return 'Grasa sin proteína';
+                                 if (low === 'a y g con proteína' || low === 'grasa con proteína' || low.includes('grasa c/prot')) return 'Grasa con proteína';
+                                 if (low === 'az sin grasa' || low === 'azúcar sin grasa' || low.includes('azúcar s')) return 'Azúcar sin grasa';
+                                 if (low === 'az con grasa' || low === 'azúcar con grasa' || low.includes('azúcar c')) return 'Azúcar con grasa';
+                                 if (low.includes('verdura')) return 'Verduras';
+                                 return g;
+                               };
+
+                               const gruposOrden = [
+                                 'Verduras',
+                                 'Frutas',
+                                 'Cereal sin grasa',
+                                 'Cereal con grasa',
+                                 'Leguminosas',
+                                 'AOA mb',
+                                 'AOA b',
+                                 'AOA moderado',
+                                 'AOA alto',
+                                 'Leche',
+                                 'Grasa sin proteína',
+                                 'Grasa con proteína',
+                                 'Azúcar sin grasa',
+                                 'Azúcar con grasa'
+                               ];
+
+                               const agregados = {};
+                               if (menu.tiemposComida) {
+                                   menu.tiemposComida.forEach(t => {
+                                       if (t.ingredientes) {
+                                           t.ingredientes.forEach(ing => {
+                                               if (ing.eqGrupo && ing.eqCantidad) {
+                                                   const mapped = mapGroupToLabel(ing.eqGrupo);
+                                                   agregados[mapped] = (agregados[mapped] || 0) + Number(ing.eqCantidad);
+                                               }
+                                           });
+                                       }
+                                   });
+                               }
+                            %>
+                            <% gruposOrden.forEach((gLabel, index) => { 
+                               const qty = agregados[gLabel];
+                               const isLast = index === gruposOrden.length - 1;
+                               const borderBottom = isLast ? '' : 'border-bottom: 1px solid #000;';
+                            %>
+                                <tr>
+                                    <td style="border: none; <%= borderBottom %> border-right: 1px solid #000; padding: 4px 8px; font-weight: normal;"><%= gLabel %></td>
+                                    <td style="border: none; <%= borderBottom %> padding: 4px 8px; font-weight: normal;"><%= qty ? qty : '-' %></td>
+                                </tr>
+                            <% }); %>
+                        </tbody>
+                    </table>
+                </div>
+            <% }); %>
+        </div>
+    <% } %>
+
     <div class="section-title">Esquema de suplementación:</div>
     <% if (plan.suplementosTabla && plan.suplementosTabla.length > 0) { %>
         <table class="supl-table">
@@ -879,16 +963,11 @@
     <% } %>
 
     <div class="section-title">Esquema de hidratación:</div>
-    <table style="width: 250px;">
+    <table class="data-table">
         <% if (plan.esqueHidratacionReciente) { %>
             <tr><td style="white-space: pre-wrap;"><%= plan.esqueHidratacionReciente %></td></tr>
-            <% if (plan.hidratacionReciente && plan.hidratacionReciente.length > 0) { %>
-                <tr><td style="color: #888; font-size: 0.85em;">Referencia expediente: <%= plan.hidratacionReciente[0] %></td></tr>
-            <% } %>
         <% } else { %>
-            <% (plan.hidratacionReciente || meta.hidratacion || ["-"]).forEach(hid => { %>
-                <tr><td><%= hid %></td></tr>
-            <% }); %>
+            <tr><td style="color: #888; font-style: italic;">Sin indicaciones específicas.</td></tr>
         <% } %>
     </table>
 

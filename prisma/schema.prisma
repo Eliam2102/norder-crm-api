@@ -29,7 +29,7 @@ model Paciente {
   @@index([fechaRegistro])
 
   datosEjercicio   DatosEjercicio?
-  consumoCalorico  ConsumoCalorico?
+  habitosAlimentarios HabitoAlimentario[]
   antecedentes     Antecedentes?
   valoraciones     Valoracion[]
   revisiones       Revision[]
@@ -65,29 +65,19 @@ model DatosEjercicio {
   @@map("datos_ejercicio")
 }
 
-model ConsumoCalorico {
-  id                    String  @id @default(uuid())
-  pacienteId            String  @unique @map("paciente_id")
-  recordatorio24hActivo Boolean @default(false) @map("recordatorio_24h_activo")
-  horaDesayuno          String? @map("hora_desayuno")
-  horaColacion1         String? @map("hora_colacion1")
-  horaAlmuerzo          String? @map("hora_almuerzo")
-  horaColacion2         String? @map("hora_colacion2")
-  horaCena              String? @map("hora_cena")
-  ayerDesayuno          String? @map("ayer_desayuno")
-  ayerColacion1         String? @map("ayer_colacion1")
-  ayerAlmuerzo          String? @map("ayer_almuerzo")
-  ayerColacion2         String? @map("ayer_colacion2")
-  ayerCena              String? @map("ayer_cena")
-  usalmenteDesayuno     String? @map("usualmente_desayuno")
-  usalmenteColacion1    String? @map("usualmente_colacion1")
-  usalmenteAlmuerzo     String? @map("usualmente_almuerzo")
-  usalmenteColacion2    String? @map("usualmente_colacion2")
-  usalmenteCena         String? @map("usualmente_cena")
+model HabitoAlimentario {
+  id         String  @id @default(uuid())
+  pacienteId String  @map("paciente_id")
+  orden      Int     @default(0)
+  label      String  // "Desayuno", "Colación", "Comida", etc.
+  hora       String?
+  ayer       String?
+  usualmente String?
 
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
-  @@map("consumo_calorico")
+  @@index([pacienteId])
+  @@map("habito_alimentario")
 }
 
 model Antecedentes {
