@@ -77,6 +77,12 @@ export const agendarCita = async (req, res) => {
         timeZone: 'America/Merida',
         language: 'es'
       },
+      responses: {
+        tipo: modalidad
+      },
+      bookingFieldsResponses: {
+        tipo: modalidad
+      },
       metadata: {
         pacienteId: paciente.id,
         ...(valoracionId && { valoracionId })
