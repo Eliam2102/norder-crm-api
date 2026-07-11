@@ -144,7 +144,6 @@ export const create = async (req, res, next) => {
                 email,
                 telefono: telefono || null,
                 estatura: estaturaVal ? parseFloat(estaturaVal) : null,
-                // peso y complexion se leen del root del payload
                 peso: req.body.peso != null && req.body.peso !== '' ? parseFloat(req.body.peso) : null,
                 complexion: complexion ? parseFloat(complexion) : null,
                 datosEjercicio: {
@@ -181,26 +180,6 @@ export const create = async (req, res, next) => {
                         suplementosDetalle: a.suplementosDetalle ?? req.body.suplementosDetalle ?? undefined,
                         farmacosDetalle: a.farmacosDetalle ?? req.body.farmacosDetalle ?? undefined
                     }
-                },
-                consumoCalorico: {
-                    create: {
-                        recordatorio24hActivo: c24.recordatorio24hActivo ?? true,
-                        horaDesayuno:     c24.desayuno?.hora ?? c24.horaDesayuno,
-                        ayerDesayuno:     c24.desayuno?.ayer ?? c24.ayerDesayuno,
-                        usalmenteDesayuno: c24.desayuno?.usualmente ?? c24.usalmenteDesayuno,
-                        horaColacion1:    c24.colacion1?.hora ?? c24.horaColacion1,
-                        ayerColacion1:    c24.colacion1?.ayer ?? c24.ayerColacion1,
-                        usalmenteColacion1: c24.colacion1?.usualmente ?? c24.usalmenteColacion1,
-                        horaAlmuerzo:     c24.almuerzo?.hora ?? c24.horaAlmuerzo,
-                        ayerAlmuerzo:     c24.almuerzo?.ayer ?? c24.ayerAlmuerzo,
-                        usalmenteAlmuerzo: c24.almuerzo?.usualmente ?? c24.usalmenteAlmuerzo,
-                        horaColacion2:    c24.colacion2?.hora ?? c24.horaColacion2,
-                        ayerColacion2:    c24.colacion2?.ayer ?? c24.ayerColacion2,
-                        usalmenteColacion2: c24.colacion2?.usualmente ?? c24.usalmenteColacion2,
-                        horaCena:         c24.cena?.hora ?? c24.horaCena,
-                        ayerCena:         c24.cena?.ayer ?? c24.ayerCena,
-                        usalmenteCena:     c24.cena?.usualmente ?? c24.usalmenteCena
-                    }
                 }
             },
             include: {
@@ -209,6 +188,49 @@ export const create = async (req, res, next) => {
                 habitosAlimentarios: { orderBy: { orden: 'asc' } }
             }
         });
+
+        // Guardar hábitos alimentarios (consumo24h / habitos) como filas independientes
+        // El schema usa HabitoAlimentario[] con campos: label, hora, ayer, usualmente
+        const habitosRows = (() => {
+            // Si viene como array directo (formato nuevo UI)
+            if (Array.isArray(habitos)) return habitos;
+            // Si viene como consumo24h plano con claves tipo horaDesayuno/ayerDesayuno/etc.
+            if (c24 && typeof c24 === 'object' && !Array.isArray(c24)) {
+                const tiempos = [
+                    { key: 'desayuno',  label: 'Desayuno' },
+                    { key: 'colacion1', label: 'Colación 1' },
+                    { key: 'almuerzo',  label: 'Comida' },
+                    { key: 'colacion2', label: 'Colación 2' },
+                    { key: 'cena',      label: 'Cena' },
+                ];
+                return tiempos.map(({ key, label }) => ({
+                    label,
+                    hora:       c24[key]?.hora       ?? c24[`hora${label.replace(' ','')}`]       ?? '',
+                    ayer:       c24[key]?.ayer       ?? c24[`ayer${label.replace(' ','')}`]       ?? '',
+                    usualmente: c24[key]?.usualmente ?? c24[`usalmente${label.replace(' ','')}`]  ?? '',
+                })).filter(r => r.hora || r.ayer || r.usualmente);
+            }
+            return [];
+        })();
+
+        if (habitosRows.length > 0) {
+            const { randomUUID } = await import('crypto');
+            await prisma.habitoAlimentario.createMany({
+                data: habitosRows.map((r, idx) => ({
+                    id: randomUUID(),
+                    pacienteId: nuevo.id,
+                    orden: idx,
+                    label: r.label || 'Tiempo',
+                    hora: r.hora || '',
+                    ayer: r.ayer || '',
+                    usualmente: r.usualmente || '',
+                }))
+            });
+            nuevo.habitosAlimentarios = await prisma.habitoAlimentario.findMany({
+                where: { pacienteId: nuevo.id },
+                orderBy: { orden: 'asc' }
+            });
+        }
 
         return ok(res, nuevo, 201);
     } catch (err) {
