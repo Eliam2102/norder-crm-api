@@ -164,6 +164,7 @@ export const create = async (req, res, next) => {
                         data: {
                             menuId: menu.id,
                             nombre: tData.nombre || 'Comida',
+                            barridoTiempoId: tData.barridoTiempoId || null,
                             orden: tIdx + 1,
                             notaPie: tData.nota || tData.notaPie || '',
                             bebida: tData.bebida || null,
@@ -412,7 +413,7 @@ export const update = async (req, res, next) => {
                 const tiempos = mData.tiempos || mData.tiemposComida || [];
                 for (const [tIdx, tData] of tiempos.entries()) {
                     const tiempo = await prisma.planTiempoComida.create({
-                        data: { menuId: menu.id, nombre: tData.nombre, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie, bebida: tData.bebida || null, suplTiempo: tData.suplTiempo || null, suplNotas: tData.suplNotas || null }
+                        data: { menuId: menu.id, nombre: tData.nombre, barridoTiempoId: tData.barridoTiempoId || null, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie, bebida: tData.bebida || null, suplTiempo: tData.suplTiempo || null, suplNotas: tData.suplNotas || null }
                     });
                     if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
                         for (const [iIdx, iData] of tData.ingredientes.entries()) {
@@ -1194,6 +1195,7 @@ export const asignarPlan = async (req, res, next) => {
                         tiemposComida: {
                             create: menu.tiemposComida.map(t => ({
                                 nombre: t.nombre,
+                                barridoTiempoId: t.barridoTiempoId,
                                 notaPie: t.notaPie,
                                 bebida: t.bebida,
                                 suplTiempo: t.suplTiempo,
