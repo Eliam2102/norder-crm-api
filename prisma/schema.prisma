@@ -343,6 +343,7 @@ model PlanTiempoComida {
   id        String   @id @default(uuid())
   menuId    String   @map("menu_id")
   nombre    String
+  barridoTiempoId String?  @map("barrido_tiempo_id")
   orden     Int      @default(1)
   notaPie    String?  @map("nota_pie")
   bebida     String?
@@ -495,9 +496,9 @@ model BarridoEquivalencias {
   id            String   @id @default(uuid())
   pacienteId    String   @map("paciente_id")
   valoracionId  String   @unique @map("valoracion_id")
-  tiempos       String // JSON array: ["Snack", "Desayuno", ...]
+  tiempos       String // JSON v2: [{ "id": "...", "nombre": "Colación" }, ...]
   porciones     String // JSON: { "frutas": 6, ... }
-  distribucion  String // JSON: { "Desayuno": { "frutas": 3, ... }, ... }
+  distribucion  String // JSON por ID de tiempo: { "tiempo-id": { "frutas": 3, ... }, ... }
   kcalTotal     Float?
   creadoEn      DateTime @default(now()) @map("creado_en")
   actualizadoEn DateTime @updatedAt @map("actualizado_en")

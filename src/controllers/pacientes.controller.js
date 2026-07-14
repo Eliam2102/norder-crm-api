@@ -198,9 +198,9 @@ export const create = async (req, res, next) => {
             if (c24 && typeof c24 === 'object' && !Array.isArray(c24)) {
                 const tiempos = [
                     { key: 'desayuno',  label: 'Desayuno' },
-                    { key: 'colacion1', label: 'Colación 1' },
+                    { key: 'colacion1', label: 'Colación' },
                     { key: 'almuerzo',  label: 'Comida' },
-                    { key: 'colacion2', label: 'Colación 2' },
+                    { key: 'colacion2', label: 'Colación' },
                     { key: 'cena',      label: 'Cena' },
                 ];
                 return tiempos.map(({ key, label }) => ({
