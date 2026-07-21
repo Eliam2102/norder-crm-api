@@ -211,17 +211,38 @@
     const menu1 = plan.menus && plan.menus[0] ? plan.menus[0] : null;
     const menu2 = plan.menus && plan.menus[1] ? plan.menus[1] : null;
 
-    // Get all distinct times from menus to draw rows
-    // Get all distinct times from menus to draw rows based on base meal name
-    let timeNames = [];
-    if (menu1) menu1.tiemposComida.forEach(t => { 
-        const baseName = t.nombre.split('.')[0].trim();
-        if (!timeNames.includes(baseName)) timeNames.push(baseName); 
-    });
-    if (menu2) menu2.tiemposComida.forEach(t => { 
-        const baseName = t.nombre.split('.')[0].trim();
-        if (!timeNames.includes(baseName)) timeNames.push(baseName); 
-    });
+    // Get all distinct time SLOTS from menus to draw rows based on base meal name.
+    // Un mismo nombre base (p.ej. "Colación") puede repetirse varias veces al día
+    // (antes de almuerzo, después de almuerzo, después de cena...), así que cada
+    // aparición se trata como una fila independiente identificada por su ocurrencia
+    // (1ª "Colación", 2ª "Colación", etc.) en vez de colapsarse por nombre.
+    let timeNames = []; // [{ name, occ }]
+    const pushTimeSlots = (menu) => {
+        if (!menu) return;
+        const localCount = {};
+        menu.tiemposComida.forEach(t => {
+            const baseName = t.nombre.split('.')[0].trim();
+            localCount[baseName] = (localCount[baseName] || 0) + 1;
+            const occ = localCount[baseName];
+            if (!timeNames.some(tn => tn.name === baseName && tn.occ === occ)) {
+                timeNames.push({ name: baseName, occ });
+            }
+        });
+    };
+    pushTimeSlots(menu1);
+    pushTimeSlots(menu2);
+
+    // Busca la n-ésima aparición de un nombre base dentro de un array de tiemposComida
+    const findTiempoByOccurrence = (tiempos, baseName, occ) => {
+        let count = 0;
+        for (const t of tiempos) {
+            if (t.nombre.split('.')[0].trim() === baseName) {
+                count++;
+                if (count === occ) return t;
+            }
+        }
+        return null;
+    };
     
     // Sort valoraciones chronologically (oldest to newest) for the history table
     // We use the 'valoraciones' variable passed explicitly by the backend payload
@@ -437,16 +458,16 @@
             <div class="menu-col text-center font-bold">MENÚ #2</div>
         </div>
         
-        <% 
-        timeNames.forEach(tName => { 
-            const tMenu1 = menu1 ? menu1.tiemposComida.find(t => t.nombre.split('.')[0].trim() === tName) : null;
-            const tMenu2 = menu2 ? menu2.tiemposComida.find(t => t.nombre.split('.')[0].trim() === tName) : null;
+        <%
+        timeNames.forEach(tRow => {
+            const tMenu1 = menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null;
+            const tMenu2 = menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null;
         %>
         <div class="menu-row">
             <!-- Menú 1 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName %>
+                    <%= tRow.name %>
                     <% if(meta[`menu1_titulo`]) { %> <%= meta[`menu1_titulo`] %> <% } %>
                 </div>
                 
@@ -537,7 +558,7 @@
             <!-- Menú 2 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName %>
+                    <%= tRow.name %>
                     <% if(meta[`menu2_titulo`]) { %> <%= meta[`menu2_titulo`] %> <% } %>
                 </div>
                 
