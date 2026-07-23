@@ -171,7 +171,6 @@ export const create = async (req, res, next) => {
             vData.creatinina = bioquimicos.Creat ? parseFloat(bioquimicos.Creat) : undefined;
         }
 
-        // Create
         const valoracion = await prisma.valoracion.create({
             data: {
                 ...vData,

@@ -5,6 +5,7 @@ import valoracionRoutes from './valoraciones.routes.js';
 import revisionRoutes from './revisiones.routes.js';
 import planRoutes from './planes.routes.js';
 import requerimientosRoutes from './requerimientos.routes.js';
+import { listPatient as listPatientPhotos } from '../controllers/fotosSeguimiento.controller.js';
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use(authMiddleware);
 router.get('/', pacientesController.getAll);
 router.post('/', pacientesController.create);
 router.get('/:id', pacientesController.getById);
+router.get('/:id/fotos', listPatientPhotos);
 router.put('/:id', pacientesController.update);
 router.delete('/:id', pacientesController.remove);
 

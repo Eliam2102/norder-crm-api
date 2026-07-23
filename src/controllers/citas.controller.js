@@ -68,7 +68,16 @@ export const agendarCita = async (req, res) => {
     };
 
     const phoneClean = cleanPhone(phone || paciente.telefono) || '+520000000000';
-    const nameClean = name || `${paciente.nombre} ${paciente.apellido || ''}`.trim();
+    const pacienteFullName = `${paciente.nombre || ''} ${paciente.apellido || ''}`.trim();
+    const requestedName = typeof name === 'string' ? name.trim() : '';
+    const apellidoNormalizado = (paciente.apellido || '').trim().toLocaleLowerCase('es-MX');
+    const requestedNameNormalizado = requestedName.toLocaleLowerCase('es-MX');
+    // Compatibilidad con clientes anteriores que enviaban únicamente paciente.nombre.
+    const nameClean = requestedName && (!apellidoNormalizado || requestedNameNormalizado.endsWith(apellidoNormalizado))
+      ? requestedName
+      : requestedName
+        ? `${requestedName} ${paciente.apellido || ''}`.trim()
+        : pacienteFullName;
     const emailClean = email || paciente.email || 'noreply@norder.mx';
 
     // Formato de payload V2 de Cal.com

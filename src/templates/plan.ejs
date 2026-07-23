@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-mx">
 <head>
     <meta charset="UTF-8">
     <title>Plan Nutricional - <%= paciente.nombre %></title>
@@ -28,6 +28,51 @@
             page-break-after: always;
             background: #fff;
         }
+        .extras-page {
+            height: 210mm;
+            min-height: 210mm;
+            overflow: hidden;
+            padding: 10mm 16mm;
+            page-break-inside: avoid;
+        }
+        .extras-page .header { margin-bottom: 10px; }
+        .extras-page .header-logo img { width: 112px; }
+        .extras-page .header-info { font-size: 7px; line-height: 1.25; }
+        .extras-page .header-info strong { font-size: 8px; }
+        .extras-page .section-title {
+            font-size: 9px;
+            margin-top: 7px !important;
+            margin-bottom: 4px !important;
+        }
+        .extras-page table { margin-bottom: 7px; }
+        .extras-page .extras-distribution-grid {
+            gap: 10px !important;
+            margin-bottom: 8px !important;
+        }
+        .extras-page .extras-distribution-card {
+            width: calc(50% - 5px) !important;
+            margin-bottom: 0 !important;
+        }
+        .extras-page .extras-distribution-title {
+            font-size: 10px !important;
+            padding: 3px 0 !important;
+        }
+        .extras-page .extras-distribution-table { margin-bottom: 0 !important; }
+        .extras-page .extras-distribution-table th,
+        .extras-page .extras-distribution-table td {
+            padding: 1.5px 6px !important;
+            font-size: 7.5px !important;
+            line-height: 1.05 !important;
+        }
+        .extras-page .supl-table { margin-bottom: 7px; }
+        .extras-page .supl-table th,
+        .extras-page .supl-table td {
+            padding: 2px 6px;
+            font-size: 8px;
+            line-height: 1.1;
+        }
+        .extras-page tr { break-inside: avoid; page-break-inside: avoid; }
+        .extras-page .section-title { break-after: avoid; page-break-after: avoid; }
 
         /* HEADER */
         .header {
@@ -74,6 +119,26 @@
             font-weight: 800;
             margin-bottom: 15px;
             color: #000;
+        }
+        .avoid-foods-summary {
+            width: 100%;
+            border: 1px solid #000;
+            margin-top: 6px;
+            padding: 5px 8px;
+            line-height: 1.25;
+            white-space: normal;
+            overflow-wrap: anywhere;
+            word-break: break-word;
+            page-break-inside: avoid;
+        }
+        .avoid-foods-summary__title {
+            display: block;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+        .avoid-foods-summary__empty {
+            color: #777;
+            font-style: italic;
         }
 
         /* TABLES */
@@ -127,7 +192,7 @@
             padding-left: 0;
             overflow: visible;
         }
-        .side-images img {
+        .side-images > .body-types-image {
             width: 240px;
             max-width: none;
             height: auto;
@@ -135,6 +200,92 @@
             object-position: right top;
             margin-top: -12px;
             transform: translateX(60px);
+        }
+        .online-followup-page {
+            display: flex;
+            flex-direction: column;
+        }
+        .online-followup-heading {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 9px;
+        }
+        .online-followup-heading .title-name { margin-bottom: 0; }
+        .online-followup-badge {
+            border: 1px solid #222;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .online-photo-gallery {
+            flex: 1;
+            min-height: 0;
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            grid-template-rows: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 7px;
+        }
+        .online-photo-gallery[data-count="1"] {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .online-photo-gallery[data-count="2"] {
+            grid-template-rows: minmax(0, 1fr);
+        }
+        .online-photo-card {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+            overflow: hidden;
+            border: 1px solid #222;
+            background: #f5f5f5;
+            padding: 5px;
+            break-inside: avoid;
+        }
+        .online-photo-gallery[data-count="1"] .online-photo-card {
+            width: 105mm;
+            height: 121mm;
+        }
+        .online-photo-card img {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            object-position: center;
+        }
+        .online-photo-principal {
+            position: absolute;
+            top: 7px;
+            left: 7px;
+            z-index: 1;
+            padding: 3px 6px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, .78);
+            color: #fff;
+            font-size: 7px;
+            font-weight: 700;
+        }
+        .online-photo-empty {
+            flex: 1;
+            min-height: 95mm;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px dashed #aaa;
+            color: #777;
+            font-size: 10px;
+        }
+        .online-followup-page .avoid-foods-summary {
+            flex-shrink: 0;
+            margin-top: 0;
         }
 
         /* ── MENU GRID — Layout auto-escalable ────────────────────────────── */
@@ -182,7 +333,7 @@
         }
         .menu-col:last-child { border-right: none; }
         /* Tamaños base — serán sobreescritos por el bloque dinámico en página 2 */
-        .menu-time { font-weight: bold; text-transform: uppercase; margin-bottom: 3px; font-size: 10px; }
+        .menu-time { font-weight: bold; margin-bottom: 3px; font-size: 10px; }
         .menu-time-subtitle { font-weight: normal; text-transform: none; font-size: 8px; display: block; margin-top: 1px; }
         .menu-item { margin-bottom: 2px; padding-left: 10px; font-size: 8.5px; line-height: 1.3; }
         .menu-sub  { display: block; padding-left: 14px; font-size: 7.5px; color: #555; line-height: 1.25; }
@@ -195,6 +346,15 @@
         .supl-activo { color: #22863a; font-weight: bold; }
         .supl-suspendido { color: #999; font-weight: bold; }
         .supl-row-suspended { opacity: 0.55; text-decoration: line-through; }
+        .spelling-preview-error {
+            color: #b91c1c !important;
+            background: rgba(254, 202, 202, 0.55);
+            text-decoration-line: underline;
+            text-decoration-style: wavy;
+            text-decoration-color: #dc2626;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
     </style>
 </head>
 <body>
@@ -206,22 +366,57 @@
     const showMenus = meta.showPageMenus !== false;
     const showIntercambio = meta.showPageIntercambio !== false;
     const showExtras = meta.showPageExtras !== false;
+    const formatMealTimeName = (value) => {
+        const original = String(value || '').trim();
+        if (!original) return '';
+        const normalized = original.toLocaleLowerCase('es-MX').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const suffixMatch = normalized.match(/^(.*?)(\s+\d+)$/);
+        const base = suffixMatch ? suffixMatch[1] : normalized;
+        const suffix = suffixMatch ? suffixMatch[2] : '';
+        const names = {
+            desayuno: 'Desayuno', colacion: 'Colación', almuerzo: 'Almuerzo', comida: 'Comida', cena: 'Cena',
+            'pre entreno': 'Pre-entreno', 'pre-entreno': 'Pre-entreno',
+            'post entreno': 'Post-entreno', 'post-entreno': 'Post-entreno'
+        };
+        return names[base] ? names[base] + suffix : original;
+    };
     
     // Setup menus map to split into Menu 1 and Menu 2 if they exist
     const menu1 = plan.menus && plan.menus[0] ? plan.menus[0] : null;
     const menu2 = plan.menus && plan.menus[1] ? plan.menus[1] : null;
 
-    // Las filas se alinean por posición. Esto conserva tiempos repetidos
-    // (por ejemplo, dos colaciones) y permite que cada menú tenga su barrido.
-    const menu1Times = menu1 && Array.isArray(menu1.tiemposComida) ? menu1.tiemposComida : [];
-    const menu2Times = menu2 && Array.isArray(menu2.tiemposComida) ? menu2.tiemposComida : [];
-    const menuRows = Array.from(
-        { length: Math.max(menu1Times.length, menu2Times.length) },
-        (_, index) => ({
-            tMenu1: menu1Times[index] || null,
-            tMenu2: menu2Times[index] || null
-        })
-    );
+    // Get all distinct time SLOTS from menus to draw rows based on base meal name.
+    // Un mismo nombre base (p.ej. "Colación") puede repetirse varias veces al día
+    // (antes de almuerzo, después de almuerzo, después de cena...), así que cada
+    // aparición se trata como una fila independiente identificada por su ocurrencia
+    // (1ª "Colación", 2ª "Colación", etc.) en vez de colapsarse por nombre.
+    let timeNames = []; // [{ name, occ }]
+    const pushTimeSlots = (menu) => {
+        if (!menu) return;
+        const localCount = {};
+        menu.tiemposComida.forEach(t => {
+            const baseName = t.nombre.split('.')[0].trim();
+            localCount[baseName] = (localCount[baseName] || 0) + 1;
+            const occ = localCount[baseName];
+            if (!timeNames.some(tn => tn.name === baseName && tn.occ === occ)) {
+                timeNames.push({ name: baseName, occ });
+            }
+        });
+    };
+    pushTimeSlots(menu1);
+    pushTimeSlots(menu2);
+
+    // Busca la n-ésima aparición de un nombre base dentro de un array de tiemposComida
+    const findTiempoByOccurrence = (tiempos, baseName, occ) => {
+        let count = 0;
+        for (const t of tiempos) {
+            if (t.nombre.split('.')[0].trim() === baseName) {
+                count++;
+                if (count === occ) return t;
+            }
+        }
+        return null;
+    };
     
     // Sort valoraciones chronologically (oldest to newest) for the history table
     // We use the 'valoraciones' variable passed explicitly by the backend payload
@@ -230,12 +425,20 @@
     const cols = Array(7).fill(null);
     hist.forEach((v, i) => { if (i < 7) cols[i] = v; });
 
+    const measurementText = (valuation, field, value) => {
+        if (!valuation) return '';
+        const status = valuation.medicionesEstado && valuation.medicionesEstado[field];
+        if (status === 'NO_APLICA') return 'No aplica';
+        if (value == null || value === '') return '-';
+        return value;
+    };
+
     const headerHTML = `
         <div class="header">
             <div class="header-logo">
                 ${logoMenuImg ? '<img src="' + logoMenuImg + '" alt="Norder">' : 'NORDER<span>THINK · EAT · LIVE</span>'}
             </div>
-            <div class="header-info">
+            <div class="header-info proper-name">
                 <strong>L.N. Eyder Méndez Gamboa</strong><br>
                 Certificación ISAK Nivel 2<br>
                 Cédula: 11181890<br>
@@ -249,13 +452,55 @@
 
 <!-- PAGE 1: HISTORIAL -->
 <% if (showHistorial) { %>
-<div class="page">
+<div class="page <%= plan.consultaEnLinea ? 'online-followup-page' : '' %>">
     <%- headerHTML %>
+    <% if (plan.consultaEnLinea) { %>
+        <%
+            const fotosOnline = Array.isArray(plan.fotosSeguimientoReporte)
+                ? plan.fotosSeguimientoReporte.slice(0, 4)
+                : [];
+        %>
+        <div class="online-followup-heading">
+            <div class="title-name proper-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
+            <div class="online-followup-badge">Consulta en línea · Seguimiento fotoscópico</div>
+        </div>
+
+        <% if (fotosOnline.length > 0) { %>
+            <div class="online-photo-gallery" data-count="<%= fotosOnline.length %>">
+                <% fotosOnline.forEach((foto, index) => { %>
+                    <div class="online-photo-card">
+                        <% if (foto.esPrincipal || index === 0) { %>
+                            <span class="online-photo-principal">Principal</span>
+                        <% } %>
+                        <img src="<%= foto.dataUrl %>" alt="Fotografía de seguimiento <%= index + 1 %>">
+                    </div>
+                <% }); %>
+            </div>
+        <% } else { %>
+            <div class="online-photo-empty">Sin fotografías de seguimiento registradas.</div>
+        <% } %>
+
+        <% if (meta.showAlimentosEvitar !== false) { %>
+            <%
+                const evitarOnline = Array.isArray(plan.evitarReciente) ? plan.evitarReciente : [];
+                const evitarOnlineTexto = evitarOnline.join(' · ');
+                const evitarOnlineFontSize = evitarOnlineTexto.length > 700 ? 6.5 : evitarOnlineTexto.length > 350 ? 7.25 : 8.5;
+            %>
+            <div class="avoid-foods-summary" style="font-size: <%= evitarOnlineFontSize %>px;">
+                <span class="avoid-foods-summary__title">Alimentos a evitar / No consume / No le gustan:</span>
+                <% if (evitarOnline.length > 0) { %>
+                    <span><%= evitarOnlineTexto %></span>
+                <% } else { %>
+                    <span class="avoid-foods-summary__empty">Sin información registrada.</span>
+                <% } %>
+            </div>
+        <% } %>
+    <% } else { %>
     <!-- Layout flex: contenido a la izquierda + imagen tipos de cuerpo a la derecha -->
     <div style="display: flex; gap: 8px; align-items: flex-start;">
         <!-- Columna izquierda: contenido -->
         <div style="flex: 1; min-width: 0;">
-            <div class="title-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
+            <div class="title-name proper-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
             
             <table>
                 <tr>
@@ -282,24 +527,24 @@
                 <tr><td colspan="8" class="font-bold text-center">Resultados Generales</td></tr>
                 <tr>
                     <td class="font-bold">Peso</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.pesoActual != null) ? c.pesoActual : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= measurementText(c, 'peso', c?.pesoActual) %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Talla (cm)</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.estatura != null) ? c.estatura : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
                 </tr>
                 <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
                 <tr>
                     <td class="font-bold">% Grasa</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.pctGrasaCorp != null) ? c.pctGrasaCorp : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= measurementText(c, 'pctGrasa', c?.pctGrasaCorp) %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Kg Grasa</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.masaGrasaReal != null) ? c.masaGrasaReal : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= measurementText(c, 'kgGrasa', c?.masaGrasaReal) %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Kg MLG</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.masaMagra != null) ? c.masaMagra : '' %></td><% }); %>
+                    <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
                 </tr>
                 <tr>
                     <td class="font-bold">Somatotipo</td>
@@ -347,7 +592,7 @@
             </ul>
 
             <% if (plan.notasLibresRecientes && plan.notasLibresRecientes.trim() !== "") { %>
-                <div class="font-bold" style="margin-bottom: 4px;">Notas libres / Seguimiento:</div>
+                <div class="font-bold" style="margin-bottom: 4px;">Notas de entrenamiento:</div>
                 <ul class="bullet-list" style="list-style-type: none;">
                     <% plan.notasLibresRecientes.split(/\r?\n/).filter(n => n.trim() !== '').forEach(item => { %>
                         <li>- &nbsp;&nbsp;<%= item.trim() %></li>
@@ -368,8 +613,8 @@
                 <div style="text-align:center; margin: 20px 0;"><span class="highlight-yellow"><%= meta.notaAmarilla %></span></div>
             <% } %>
 
-<% if (meta.showContacto !== false) { %>
-            <table style="width:100%; border-collapse: collapse; margin-bottom: 0;">
+<% if (meta.showContacto === true) { %>
+            <table style="width:100%; border-collapse: collapse; margin-bottom: 6px;">
                 <tr>
                     <td style="width:50%; padding: 2px 8px; border-right: none; vertical-align: middle;">
                         <span style="font-weight:700; font-size:8.5px;">Correo: </span>
@@ -385,18 +630,41 @@
                 </tr>
             </table>
 <% } %>
+
+<% if (meta.showAlimentosEvitar !== false) { %>
+            <%
+                const evitarPrimeraHoja = Array.isArray(plan.evitarReciente) ? plan.evitarReciente : [];
+                const evitarTexto = evitarPrimeraHoja.join(' · ');
+                const evitarFontSize = evitarTexto.length > 700 ? 6.5 : evitarTexto.length > 350 ? 7.25 : 8.5;
+            %>
+            <div class="avoid-foods-summary" style="font-size: <%= evitarFontSize %>px;">
+                <span class="avoid-foods-summary__title">Alimentos a evitar / No consume / No le gustan:</span>
+                <% if (evitarPrimeraHoja.length > 0) { %>
+                    <span><%= evitarTexto %></span>
+                <% } else { %>
+                    <span class="avoid-foods-summary__empty">Sin información registrada.</span>
+                <% } %>
+            </div>
+<% } %>
         </div>
 
         <!-- Columna derecha: Guía Tipos de Cuerpo HTML nativo -->
         <!-- Columna derecha: Imagen Tipos de Cuerpo, alineada y agrandada -->
         <div class="side-images">
+            <% if (plan.fotoSeguimientoPrincipal) { %>
+                <div class="followup-photo" style="margin:0 auto 7px; text-align:center; break-inside:avoid;">
+                    <div style="font-size:7px; font-weight:700; margin-bottom:2px;">Seguimiento fotoscópico</div>
+                    <img src="<%= plan.fotoSeguimientoPrincipal %>" alt="Seguimiento fotoscópico" style="width:2cm; height:2cm; object-fit:contain; object-position:center; border:1px solid #222; background:#fff; padding:1px;" />
+                </div>
+            <% } %>
             <% if (tiposCuerpoImg) { %>
-                <img src="<%= tiposCuerpoImg %>" alt="Tipos de cuerpo">
+                <img class="body-types-image" src="<%= tiposCuerpoImg %>" alt="Tipos de cuerpo">
             <% } else { %>
                 <div style="font-size:8px; font-weight:bold; color:#aaa; text-align:center; padding:10px 4px;">[Tipos de cuerpo]</div>
             <% } %>
         </div>
     </div>
+    <% } %>
 </div>
 <% } %>
 
@@ -405,7 +673,7 @@
 <% if (showMenus) { %>
 <%
     // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida haya
-    const _nT = menuRows.length;
+    const _nT = timeNames.length;
     // Factor de escala: 1.0 para ≤4, baja gradualmente hasta 0.58 para 9+
     const _fS = _nT <= 3 ? 1.0
               : _nT === 4 ? 0.95
@@ -437,16 +705,16 @@
             <div class="menu-col text-center font-bold">MENÚ #2</div>
         </div>
         
-        <% 
-        menuRows.forEach(({ tMenu1, tMenu2 }) => {
-            const tName1 = tMenu1 ? tMenu1.nombre.split('.')[0].trim() : '';
-            const tName2 = tMenu2 ? tMenu2.nombre.split('.')[0].trim() : '';
+        <%
+        timeNames.forEach(tRow => {
+            const tMenu1 = menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null;
+            const tMenu2 = menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null;
         %>
         <div class="menu-row">
             <!-- Menú 1 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName1 || tName2 %>
+                    <%= formatMealTimeName(tRow.name) %>
                     <% if(meta[`menu1_titulo`]) { %> <%= meta[`menu1_titulo`] %> <% } %>
                 </div>
                 
@@ -537,7 +805,7 @@
             <!-- Menú 2 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName2 || tName1 %>
+                    <%= formatMealTimeName(tRow.name) %>
                     <% if(meta[`menu2_titulo`]) { %> <%= meta[`menu2_titulo`] %> <% } %>
                 </div>
                 
@@ -845,18 +1113,18 @@
 
 <!-- PAGE 4: EXTRAS -->
 <% if (showExtras) { %>
-<div class="page">
+<div class="page extras-page">
     <%- headerHTML %>
     
     <% if (meta.showDistribucionPorciones !== false && plan.menus && plan.menus.length > 0) { %>
-        <div class="section-title" style="margin-bottom: 15px;">Distribución de porciones en el día</div>
-        <div style="display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap;">
+        <div class="section-title">Distribución de porciones en el día</div>
+        <div class="extras-distribution-grid" style="display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap;">
             <% plan.menus.forEach(menu => { %>
-                <div style="border: 1px solid #000; width: calc(50% - 10px); box-sizing: border-box; margin-bottom: 10px;">
-                    <div style="text-align: center; font-weight: 800; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #000;">
+                <div class="extras-distribution-card" style="border: 1px solid #000; width: calc(50% - 10px); box-sizing: border-box; margin-bottom: 10px;">
+                    <div class="extras-distribution-title" style="text-align: center; font-weight: 800; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #000;">
                         <%= menu.nombre %>
                     </div>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                    <table class="extras-distribution-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <thead>
                             <tr>
                                 <th style="border: none; border-bottom: 1px solid #000; border-right: 1px solid #000; text-align: left; padding: 4px 8px; font-weight: bold; background: transparent;">ALIMENTOS</th>
@@ -971,17 +1239,6 @@
         <% } %>
     </table>
 
-    <div class="section-title">Alimentos a evitar:</div>
-    <table style="width: 450px;">
-        <% if (plan.evitarReciente && plan.evitarReciente.length > 0) { %>
-            <% plan.evitarReciente.forEach(ev => { %>
-                <tr><td><%= ev %></td></tr>
-            <% }); %>
-        <% } else { %>
-            <tr><td>-</td></tr>
-        <% } %>
-    </table>
-
     <% if (meta.estrategiaMaraton && meta.estrategiaMaraton.mostrar !== false) { %>
         <div class="section-title"><span class="highlight-yellow"><%= meta.estrategiaMaraton.titulo || 'Estrategia para 1/2 maraton' %></span></div>
         <table>
@@ -1003,6 +1260,52 @@
         </table>
     <% } %>
 </div>
+<% } %>
+
+<% if (Array.isArray(plan.spellingPreviewIssues) && plan.spellingPreviewIssues.length > 0) { %>
+<script>
+    (() => {
+        const issueWords = <%- JSON.stringify(plan.spellingPreviewIssues.map(issue => issue.word)).replace(/</g, '\\u003c') %>;
+        const normalizedIssues = new Set(issueWords.map(word => word.toLocaleLowerCase('es-MX')));
+        const wordPattern = /[\p{L}]+(?:[’'-][\p{L}]+)*/gu;
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent || parent.closest('script, style, .proper-name, .spelling-preview-error')) return NodeFilter.FILTER_REJECT;
+                wordPattern.lastIndex = 0;
+                return wordPattern.test(node.nodeValue || '') ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+            }
+        });
+        const nodes = [];
+        while (walker.nextNode()) nodes.push(walker.currentNode);
+
+        nodes.forEach(node => {
+            const text = node.nodeValue || '';
+            const fragment = document.createDocumentFragment();
+            let cursor = 0;
+            let hasIssue = false;
+            wordPattern.lastIndex = 0;
+
+            for (const match of text.matchAll(wordPattern)) {
+                const word = match[0];
+                const index = match.index || 0;
+                fragment.append(document.createTextNode(text.slice(cursor, index)));
+                if (normalizedIssues.has(word.toLocaleLowerCase('es-MX'))) {
+                    const marker = document.createElement('span');
+                    marker.className = 'spelling-preview-error';
+                    marker.textContent = word;
+                    fragment.append(marker);
+                    hasIssue = true;
+                } else {
+                    fragment.append(document.createTextNode(word));
+                }
+                cursor = index + word.length;
+            }
+            fragment.append(document.createTextNode(text.slice(cursor)));
+            if (hasIssue) node.replaceWith(fragment);
+        });
+    })();
+</script>
 <% } %>
 
 </body>
