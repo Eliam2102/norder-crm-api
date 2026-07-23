@@ -1,12 +1,26 @@
 import 'dotenv/config';
 import prisma from '../lib/prisma.js';
 import axios from 'axios';
+import {
+  MEXICO_CITY_TIME_ZONE,
+  normalizeBookingStart
+} from '../lib/timeZone.js';
 
 const CALCOM_API_URL = 'https://api.cal.com/v2';
-const CALCOM_API_VERSION = '2024-08-13';
+const CALCOM_SLOTS_API_VERSION = '2024-09-04';
+const CALCOM_BOOKINGS_API_VERSION = '2026-02-25';
 // Los event types son del equipo "NORDER Health" (team slug: norder-health).
 // Los team event types NO requieren el param 'username' — usan su propio scope.
 
+export const normalizeCalcomSlots = (responseData) => {
+  return Object.fromEntries(Object.entries(responseData || {}).map(([day, entries]) => [
+    day,
+    (Array.isArray(entries) ? entries : []).map(entry => {
+      const instant = normalizeBookingStart(entry?.start || entry?.time);
+      return instant ? { time: instant.toISOString() } : null;
+    }).filter(Boolean)
+  ]));
+};
 
 export const getSlots = async (req, res) => {
   try {
@@ -16,24 +30,30 @@ export const getSlots = async (req, res) => {
       return res.status(400).json({ error: 'Faltan parámetros requeridos (eventTypeId, startTime, endTime)' });
     }
 
-    const response = await axios.get(`${CALCOM_API_URL}/slots/available`, {
+    const normalizedStart = normalizeBookingStart(startTime);
+    const normalizedEnd = normalizeBookingStart(endTime);
+    if (!normalizedStart || !normalizedEnd) {
+      return res.status(400).json({ error: 'El rango de fechas debe incluir una zona horaria válida' });
+    }
+
+    const response = await axios.get(`${CALCOM_API_URL}/slots`, {
       params: {
         eventTypeId,
-        startTime: startTime,
-        endTime: endTime,
-        timeZone: 'America/Merida',
+        start: normalizedStart.toISOString(),
+        end: normalizedEnd.toISOString(),
+        timeZone: MEXICO_CITY_TIME_ZONE,
         // Los event types son de equipo (NORDER Health) — no se pasa username
         // individual ya que el equipo tiene su propio calendario compartido.
       },
       headers: {
         Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
-        'cal-api-version': CALCOM_API_VERSION,
+        'cal-api-version': CALCOM_SLOTS_API_VERSION,
       },
     });
 
-    // En API v2 las respuestas vienen envueltas en { status: 'success', data: ... }
-    const responseData = response.data?.data || response.data;
-    res.json(responseData);
+    const responseData = response.data?.data || {};
+    const slots = normalizeCalcomSlots(responseData);
+    res.json({ slots });
   } catch (error) {
     console.error('Error al obtener slots de Cal.com:', error.response?.data || error.message);
     res.status(500).json({
@@ -80,15 +100,22 @@ export const agendarCita = async (req, res) => {
         : pacienteFullName;
     const emailClean = email || paciente.email || 'noreply@norder.mx';
 
-    // Formato de payload V2 de Cal.com
+    const requestedStart = normalizeBookingStart(fecha);
+    if (!requestedStart) {
+      return res.status(400).json({
+        error: 'La fecha de la cita debe incluir una hora válida y zona horaria'
+      });
+    }
+
+    // Cal.com requiere el inicio como instante UTC ISO 8601.
     const bookingPayload = {
       eventTypeId: Number(eventTypeId),
-      start: fecha,
+      start: requestedStart.toISOString(),
       attendee: {
         name: nameClean,
         email: emailClean,
         phoneNumber: phoneClean,
-        timeZone: 'America/Merida',
+        timeZone: MEXICO_CITY_TIME_ZONE,
         language: 'es'
       },
       metadata: {
@@ -105,7 +132,7 @@ export const agendarCita = async (req, res) => {
       const bookingResponse = await axios.post(`${CALCOM_API_URL}/bookings`, bookingPayload, {
         headers: {
           Authorization: `Bearer ${process.env.CALCOM_API_KEY}`,
-          'cal-api-version': CALCOM_API_VERSION,
+          'cal-api-version': CALCOM_BOOKINGS_API_VERSION,
           'Content-Type': 'application/json'
         }
       });
@@ -121,14 +148,19 @@ export const agendarCita = async (req, res) => {
       });
     }
 
+    // La respuesta de Cal.com es la fuente canónica. Si Cal.com normalizó el
+    // instante, almacenamos exactamente ese valor en UTC.
+    const confirmedStart = normalizeBookingStart(bookingData?.start)
+      || requestedStart;
+
     // 3. Guardar en BD local
     const cita = await prisma.cita.create({
       data: {
         pacienteId,
         ...(valoracionId && { valoracionId }),
-        fecha: new Date(fecha),
+        fecha: confirmedStart,
         modalidad,
-        calcomBookingId: String(bookingData.id),
+        calcomBookingId: String(bookingData.uid || bookingData.id),
         calcomEventTypeId: Number(eventTypeId)
       }
     });

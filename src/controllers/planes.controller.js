@@ -10,6 +10,7 @@ import {
 } from '../lib/menuEquivalencias.js';
 import { collectPlanSpellingIssues } from '../services/spellcheck.service.js';
 import { normalizeDeliveryChannels, normalizeOrchestratorChannelStatus } from '../lib/planDelivery.js';
+import { mexicoCityDateTimeToUtc } from '../lib/timeZone.js';
 
 export const getMenuPersistenceData = (menuData = {}) => ({
     tipoContenido: menuData.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos',
@@ -17,6 +18,33 @@ export const getMenuPersistenceData = (menuData = {}) => ({
         ? menuData.barridoEquivalencias
         : null
 });
+
+const findNextCitaForPlan = async (plan) => {
+    if (!plan?.pacienteId) return null;
+    const futureFilter = { gte: new Date() };
+
+    if (plan.valoracionId) {
+        const linked = await prisma.cita.findFirst({
+            where: {
+                pacienteId: plan.pacienteId,
+                valoracionId: plan.valoracionId,
+                fecha: futureFilter
+            },
+            orderBy: { fecha: 'asc' },
+            select: { fecha: true }
+        });
+        if (linked) return linked;
+    }
+
+    return prisma.cita.findFirst({
+        where: {
+            pacienteId: plan.pacienteId,
+            fecha: futureFilter
+        },
+        orderBy: { fecha: 'asc' },
+        select: { fecha: true }
+    });
+};
 
 export const getAll = async (req, res, next) => {
     try {
@@ -102,11 +130,9 @@ export const create = async (req, res, next) => {
         const cP = parseFloat((carbohidratosPct || 0).toString().replace(',', '.'));
         const gP = parseFloat((grasasPct || 0).toString().replace(',', '.'));
 
-        let proximaDateTime = null;
-        if (proximaSesion) {
-            proximaDateTime = new Date(`${proximaSesion}T${proximaSesionHora || '00:00'}:00`);
-            if (isNaN(proximaDateTime.getTime())) proximaDateTime = null;
-        }
+        const proximaDateTime = proximaSesion
+            ? mexicoCityDateTimeToUtc(proximaSesion, proximaSesionHora || '00:00')
+            : null;
 
         // Obtener peso del paciente para calcular gr/kg
         let pesoKg = 0;
@@ -336,6 +362,8 @@ export const getById = async (req, res, next) => {
             });
             attachLegacyBarridoToEmptyMenus(plan, legacyBarrido);
         }
+        const nextCita = await findNextCitaForPlan(plan);
+        if (nextCita) plan.proximaSesion = nextCita.fecha;
         return ok(res, plan);
     } catch (err) {
         next(err);
@@ -413,8 +441,11 @@ export const update = async (req, res, next) => {
         }
 
         if (proximaSesion) {
-            let pDate = new Date(`${proximaSesion}T${proximaSesionHora || '00:00'}:00`);
-            if (!isNaN(pDate.getTime())) dataUpdate.proximaSesion = pDate;
+            const pDate = mexicoCityDateTimeToUtc(
+                proximaSesion,
+                proximaSesionHora || '00:00'
+            );
+            if (pDate) dataUpdate.proximaSesion = pDate;
         }
 
         // Actualización de Plan
@@ -741,29 +772,10 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             select: { calorias: true, valoracionId: true, fechaCreacion: true }
         });
 
-        // --- FIX: Buscar próxima cita vinculada a la valoración del plan ---
-        // Prioridad 1: cita asociada al valoracionId específico del plan
-        let nextCita = null;
-        if (plan.valoracionId) {
-            nextCita = await prisma.cita.findFirst({
-                where: {
-                    valoracionId: plan.valoracionId,
-                },
-                orderBy: { fecha: 'asc' },
-                select: { fecha: true }
-            });
-        }
-        // Prioridad 2: fallback → próxima cita futura del paciente (cualquiera)
-        if (!nextCita) {
-            nextCita = await prisma.cita.findFirst({
-                where: {
-                    pacienteId: plan.pacienteId,
-                    fecha: { gte: new Date() }
-                },
-                orderBy: { fecha: 'asc' },
-                select: { fecha: true }
-            });
-        }
+        // La cita local se crea con la hora canónica confirmada por Cal.com.
+        // Prioriza la ligada a esta valoración y usa la próxima del paciente
+        // únicamente como respaldo.
+        const nextCita = await findNextCitaForPlan(plan);
         if (nextCita) {
             plan.proximaSesion = nextCita.fecha;
         }

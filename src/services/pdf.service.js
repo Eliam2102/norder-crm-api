@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import prisma from "../lib/prisma.js";
 import ejs from "ejs";
+import { formatMexicoCityDateTime } from "../lib/timeZone.js";
 
 const ASSETS_DIR = path.join(process.cwd(), "src", "assets");
 
@@ -27,6 +28,7 @@ const renderHTML = async (plan, paciente, config, valoraciones = []) => {
         // Imágenes de activos embebidas como base64 para que Puppeteer las renderice correctamente
         tiposCuerpoImg: loadImageAsBase64("tipos_cuerpo.png"),
         logoMenuImg: loadImageAsBase64("logo-nrdr-menu.png"),
+        formatMexicoCityDateTime,
     });
     
     return html;
