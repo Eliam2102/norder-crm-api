@@ -4,6 +4,7 @@ import { ok, error } from '../utils/response.js';
 import * as pdfService from '../services/pdf.service.js';
 import { sendPlanEmail } from '../services/email.service.js';
 import { sendPlanWhatsApp } from '../services/whatsapp.service.js';
+import { collectPlanSpellingIssues } from '../services/spellcheck.service.js';
 
 export const getAll = async (req, res, next) => {
     try {
@@ -575,6 +576,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 masaMagra: true,
                 masaGrasaReal: true,
                 kgGrasa2comp: true,
+                medicionesEstado: true,
                 numeroValoracion: true,
                 clasificacionIp: true,
                 clasifComplexion: true,
@@ -623,6 +625,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                     masaMagra: true,
                     masaGrasaReal: true,
                     kgGrasa2comp: true,
+                    medicionesEstado: true,
                     numeroValoracion: true,
                     clasificacionIp: true,
                     clasifComplexion: true,
@@ -653,8 +656,60 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             });
         }
 
+        // La valoración de referencia define la modalidad que debe reflejar el
+        // reporte. Si el plan no está ligado explícitamente a una valoración,
+        // usamos la más reciente disponible dentro de su ventana histórica.
+        const valoracionReferencia = (
+            (plan.valoracionId && rawValoraciones.find(v => v.id === plan.valoracionId))
+            || rawValoraciones[0]
+            || null
+        );
+        plan.consultaEnLinea = valoracionReferencia?.medicionesEstado?.consultaEnLinea === true;
+
         // Reloj histórico: Solo mostramos las últimas 7.
         valoraciones = rawValoraciones.slice(0, 7);
+
+        // Método fotoscópico: en consulta presencial se conserva la fotografía
+        // principal; en consulta en línea el template utiliza hasta cuatro fotos
+        // de la misma valoración. Nunca mezclamos fotos de consultas distintas.
+        let valoracionFotosId = plan.valoracionId || valoracionReferencia?.id || null;
+        let fotosSeguimiento = [];
+
+        if (valoracionFotosId) {
+            fotosSeguimiento = await prisma.fotoSeguimiento.findMany({
+                where: { pacienteId: plan.pacienteId, valoracionId: valoracionFotosId },
+                orderBy: [{ esPrincipal: 'desc' }, { createdAt: 'asc' }],
+                take: 4
+            });
+        }
+
+        // Compatibilidad con planes históricos sin valoracionId: localizamos la
+        // consulta más reciente con foto y después traemos su conjunto completo.
+        if (fotosSeguimiento.length === 0 && !plan.valoracionId) {
+            const fotoReferencia = await prisma.fotoSeguimiento.findFirst({
+                where: {
+                    pacienteId: plan.pacienteId,
+                    valoracion: { deletedAt: null, fecha: { lte: dateLimit } }
+                },
+                orderBy: [{ valoracion: { fecha: 'desc' } }, { esPrincipal: 'desc' }, { createdAt: 'desc' }],
+                select: { valoracionId: true }
+            });
+            valoracionFotosId = fotoReferencia?.valoracionId || null;
+            if (valoracionFotosId) {
+                fotosSeguimiento = await prisma.fotoSeguimiento.findMany({
+                    where: { pacienteId: plan.pacienteId, valoracionId: valoracionFotosId },
+                    orderBy: [{ esPrincipal: 'desc' }, { createdAt: 'asc' }],
+                    take: 4
+                });
+            }
+        }
+
+        plan.fotosSeguimientoReporte = fotosSeguimiento.map(foto => ({
+            id: foto.id,
+            esPrincipal: foto.esPrincipal,
+            dataUrl: `data:${foto.mimeType};base64,${Buffer.from(foto.datos).toString('base64')}`
+        }));
+        plan.fotoSeguimientoPrincipal = plan.fotosSeguimientoReporte[0]?.dataUrl || null;
 
         const historicoPlanes = await prisma.plan.findMany({
             where: { pacienteId: plan.pacienteId },
@@ -868,12 +923,22 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
     plan.notasClinicasRecientes = ultimaVal?.comentarios || "";
     plan.notasLibresRecientes = ultimaVal?.notasLibres || "";
 
-    plan.evitarReciente = [];
-    if (ultimaVal?.evitar) {
-        plan.evitarReciente = ultimaVal.evitar.split('\n').filter(e => e.trim());
-    } else if (antecedentes?.alimentosNoGustan) {
-        plan.evitarReciente = [antecedentes.alimentosNoGustan];
+    // Combinar las restricciones de la consulta asociada con las del expediente.
+    let evitarValoracion = ultimaVal?.evitar || '';
+    if (plan.valoracionId) {
+        const valoracionDelPlan = await prisma.valoracion.findUnique({
+            where: { id: plan.valoracionId },
+            select: { evitar: true }
+        });
+        evitarValoracion = valoracionDelPlan?.evitar || evitarValoracion;
     }
+    const evitarCandidatos = [
+        ...String(evitarValoracion || '').split(/\r?\n/),
+        ...String(antecedentes?.alimentosNoGustan || '').split(/\r?\n/)
+    ].map(item => item.trim()).filter(Boolean);
+    plan.evitarReciente = evitarCandidatos.filter((item, index) =>
+        evitarCandidatos.findIndex(candidate => candidate.toLocaleLowerCase('es-MX') === item.toLocaleLowerCase('es-MX')) === index
+    );
 
     // Hidratación: priorizar esqueHidratacion de la valoración asociada al plan,
     // luego el de la valoración más reciente, y antecedentes.agua como dato de expediente.
@@ -974,6 +1039,9 @@ export const generatePdfPreview = async (req, res, next) => {
         });
 
         const { planEnriquecido, valoraciones } = await enrichPlanForPdf(planRow, metaOverride);
+        // Las marcas se agregan únicamente al preview. El PDF oficial y el envío
+        // al paciente no pasan por esta propiedad temporal.
+        planEnriquecido.spellingPreviewIssues = collectPlanSpellingIssues(planEnriquecido);
 
         console.log("PDF PREVIEW - Plan ID:", planRow.id, "Paciente ID:", planRow.pacienteId);
         console.log("Valoraciones obtained:", valoraciones?.length);

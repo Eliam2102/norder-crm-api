@@ -40,6 +40,8 @@ model Paciente {
   citas            Cita[]
   mensajesPortal   MensajePortal[]
   resumenMemoria   ResumenPaciente?
+  fotosSeguimiento FotoSeguimiento[]
+  fotosLogs         FotoSeguimientoLog[]
 
   @@map("paciente")
 }
@@ -111,8 +113,8 @@ model Valoracion {
   fecha                   DateTime @default(now()) @db.Date
   hora                    String?
   numeroValoracion        Int?     @map("numero_valoracion")
-  pesoActual              Decimal  @map("peso_actual") @db.Decimal(12, 4)
-  estatura                Decimal  @map("estatura") @db.Decimal(12, 4)
+  pesoActual              Decimal? @map("peso_actual") @db.Decimal(12, 4)
+  estatura                Decimal? @map("estatura") @db.Decimal(12, 4)
   imc                     Decimal? @db.Decimal(12, 4)
   clasificacionImc        String?  @map("clasificacion_imc")
   // Pliegues
@@ -207,6 +209,7 @@ model Valoracion {
   notasLibres             String?  @map("notas_libres")
   esqueHidratacion        String?  @map("esche_hidratacion")
   adjuntosJson            Json?    @map("adjuntos_json")
+  medicionesEstado        Json?    @map("mediciones_estado")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
@@ -219,7 +222,12 @@ model Valoracion {
   planes          Plan[]
   requerimientos  Requerimiento[]
   barrido         BarridoEquivalencias?
-  citas           Cita[]
+  // Mantener el nombre público `citas` porque los controladores existentes lo
+  // consumen para el directorio clínico y el dashboard.
+  citas            Cita[]               @relation("CitaOrigen")
+  citaAtendida     Cita?                @relation("CitaAtendida")
+  fotosSeguimiento FotoSeguimiento[]
+  fotosLogs         FotoSeguimientoLog[]
 
   @@index([pacienteId])
   @@index([fecha])
@@ -586,6 +594,7 @@ model Cita {
   id                String   @id @default(uuid())
   pacienteId        String   @map("paciente_id")
   valoracionId      String?  @map("valoracion_id")
+  valoracionAtendidaId String? @unique @map("valoracion_atendida_id")
   fecha             DateTime
   modalidad         String
   calcomBookingId   String?  @map("calcom_booking_id")
@@ -593,10 +602,55 @@ model Cita {
   createdAt         DateTime @default(now()) @map("created_at")
 
   paciente   Paciente    @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
+  valoracion         Valoracion? @relation("CitaOrigen", fields: [valoracionId], references: [id], onDelete: SetNull)
+  valoracionAtendida Valoracion? @relation("CitaAtendida", fields: [valoracionAtendidaId], references: [id], onDelete: SetNull)
 
   @@index([pacienteId])
   @@index([valoracionId])
+  @@index([valoracionAtendidaId])
   @@index([fecha])
   @@map("cita")
+}
+
+model FotoSeguimiento {
+  id             String   @id @default(uuid())
+  pacienteId     String   @map("paciente_id")
+  valoracionId   String   @map("valoracion_id")
+  datos          Bytes
+  mimeType       String   @map("mime_type")
+  nombreOriginal String?  @map("nombre_original")
+  tamanoBytes    Int      @map("tamano_bytes")
+  ancho          Int?
+  alto           Int?
+  esPrincipal    Boolean  @default(false) @map("es_principal")
+  cargadaPorId   String?  @map("cargada_por_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  paciente   Paciente   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  valoracion Valoracion @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
+  logs       FotoSeguimientoLog[]
+
+  @@index([pacienteId, createdAt])
+  @@index([valoracionId, createdAt])
+  @@map("foto_seguimiento")
+}
+
+model FotoSeguimientoLog {
+  id           String   @id @default(uuid())
+  pacienteId   String   @map("paciente_id")
+  valoracionId String   @map("valoracion_id")
+  fotoId       String?  @map("foto_id")
+  actorId      String?  @map("actor_id")
+  actorTipo    String   @map("actor_tipo")
+  accion       String
+  detalle      Json?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  paciente   Paciente          @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  valoracion Valoracion        @relation(fields: [valoracionId], references: [id], onDelete: Cascade)
+  foto       FotoSeguimiento?  @relation(fields: [fotoId], references: [id], onDelete: SetNull)
+
+  @@index([pacienteId, createdAt])
+  @@index([valoracionId, createdAt])
+  @@map("foto_seguimiento_log")
 }

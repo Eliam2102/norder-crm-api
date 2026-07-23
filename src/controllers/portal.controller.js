@@ -180,6 +180,7 @@ export const getMe = async (req, res) => {
                 masaGrasaReal: true,
                 kgGrasa2comp: true,
                 imc: true,
+                medicionesEstado: true,
             }
         });
 
@@ -223,6 +224,7 @@ export const getMe = async (req, res) => {
                 masaMagra:     masaMagraActual,
                 kgGrasa:       kgGrasaActual,
                 imc:           imcActual,
+                medicionesEstado: actual?.medicionesEstado || {},
                 fechaUltimaVal: actual?.fecha || null,
                 delta,
             }
