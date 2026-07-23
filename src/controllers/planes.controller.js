@@ -4,6 +4,17 @@ import { ok, error } from '../utils/response.js';
 import * as pdfService from '../services/pdf.service.js';
 import { sendPlanEmail } from '../services/email.service.js';
 import { sendPlanWhatsApp } from '../services/whatsapp.service.js';
+import {
+    attachLegacyBarridoToEmptyMenus,
+    materializeMenuEquivalences
+} from '../lib/menuEquivalencias.js';
+
+export const getMenuPersistenceData = (menuData = {}) => ({
+    tipoContenido: menuData.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos',
+    barridoEquivalencias: menuData.barridoEquivalencias && typeof menuData.barridoEquivalencias === 'object'
+        ? menuData.barridoEquivalencias
+        : null
+});
 
 export const getAll = async (req, res, next) => {
     try {
@@ -154,7 +165,8 @@ export const create = async (req, res, next) => {
                     data: {
                         planId: nuevoPlan.id,
                         nombre: mData.nombre || `Menú ${mIdx + 1}`,
-                        orden: mIdx + 1
+                        orden: mIdx + 1,
+                        ...getMenuPersistenceData(mData)
                     }
                 });
 
@@ -316,6 +328,12 @@ export const getById = async (req, res, next) => {
                 }
             }
         });
+        if (plan.valoracionId) {
+            const legacyBarrido = await prisma.barridoEquivalencias.findUnique({
+                where: { valoracionId: plan.valoracionId }
+            });
+            attachLegacyBarridoToEmptyMenus(plan, legacyBarrido);
+        }
         return ok(res, plan);
     } catch (err) {
         next(err);
@@ -408,7 +426,12 @@ export const update = async (req, res, next) => {
             await prisma.planMenu.deleteMany({ where: { planId: id } });
             for (const [mIdx, mData] of menus.entries()) {
                 const menu = await prisma.planMenu.create({
-                    data: { planId: id, nombre: mData.nombre, orden: mIdx + 1 }
+                    data: {
+                        planId: id,
+                        nombre: mData.nombre,
+                        orden: mIdx + 1,
+                        ...getMenuPersistenceData(mData)
+                    }
                 });
                 const tiempos = mData.tiempos || mData.tiemposComida || [];
                 for (const [tIdx, tData] of tiempos.entries()) {
@@ -911,6 +934,17 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
         orderBy: [{ grupo: 'asc' }, { nombre: 'asc' }]
     });
 
+    // Compatibilidad hacia atrás: antes del barrido independiente por menú,
+    // algunos planes guardaban los tiempos vacíos y las equivalencias únicamente
+    // en el barrido de la valoración.
+    if (plan.valoracionId) {
+        const legacyBarrido = await prisma.barridoEquivalencias.findUnique({
+            where: { valoracionId: plan.valoracionId }
+        });
+        attachLegacyBarridoToEmptyMenus(plan, legacyBarrido);
+    }
+    materializeMenuEquivalences(plan);
+
     return { planEnriquecido: plan, valoraciones };
 };
 
@@ -1192,6 +1226,8 @@ export const asignarPlan = async (req, res, next) => {
                     create: original.menus.map(menu => ({
                         nombre: menu.nombre,
                         orden: menu.orden,
+                        tipoContenido: menu.tipoContenido,
+                        barridoEquivalencias: menu.barridoEquivalencias,
                         tiemposComida: {
                             create: menu.tiemposComida.map(t => ({
                                 nombre: t.nombre,

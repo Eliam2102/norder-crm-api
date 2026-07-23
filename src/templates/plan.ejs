@@ -211,17 +211,17 @@
     const menu1 = plan.menus && plan.menus[0] ? plan.menus[0] : null;
     const menu2 = plan.menus && plan.menus[1] ? plan.menus[1] : null;
 
-    // Get all distinct times from menus to draw rows
-    // Get all distinct times from menus to draw rows based on base meal name
-    let timeNames = [];
-    if (menu1) menu1.tiemposComida.forEach(t => { 
-        const baseName = t.nombre.split('.')[0].trim();
-        if (!timeNames.includes(baseName)) timeNames.push(baseName); 
-    });
-    if (menu2) menu2.tiemposComida.forEach(t => { 
-        const baseName = t.nombre.split('.')[0].trim();
-        if (!timeNames.includes(baseName)) timeNames.push(baseName); 
-    });
+    // Las filas se alinean por posición. Esto conserva tiempos repetidos
+    // (por ejemplo, dos colaciones) y permite que cada menú tenga su barrido.
+    const menu1Times = menu1 && Array.isArray(menu1.tiemposComida) ? menu1.tiemposComida : [];
+    const menu2Times = menu2 && Array.isArray(menu2.tiemposComida) ? menu2.tiemposComida : [];
+    const menuRows = Array.from(
+        { length: Math.max(menu1Times.length, menu2Times.length) },
+        (_, index) => ({
+            tMenu1: menu1Times[index] || null,
+            tMenu2: menu2Times[index] || null
+        })
+    );
     
     // Sort valoraciones chronologically (oldest to newest) for the history table
     // We use the 'valoraciones' variable passed explicitly by the backend payload
@@ -405,7 +405,7 @@
 <% if (showMenus) { %>
 <%
     // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida haya
-    const _nT = timeNames.length;
+    const _nT = menuRows.length;
     // Factor de escala: 1.0 para ≤4, baja gradualmente hasta 0.58 para 9+
     const _fS = _nT <= 3 ? 1.0
               : _nT === 4 ? 0.95
@@ -438,15 +438,15 @@
         </div>
         
         <% 
-        timeNames.forEach(tName => { 
-            const tMenu1 = menu1 ? menu1.tiemposComida.find(t => t.nombre.split('.')[0].trim() === tName) : null;
-            const tMenu2 = menu2 ? menu2.tiemposComida.find(t => t.nombre.split('.')[0].trim() === tName) : null;
+        menuRows.forEach(({ tMenu1, tMenu2 }) => {
+            const tName1 = tMenu1 ? tMenu1.nombre.split('.')[0].trim() : '';
+            const tName2 = tMenu2 ? tMenu2.nombre.split('.')[0].trim() : '';
         %>
         <div class="menu-row">
             <!-- Menú 1 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName %>
+                    <%= tName1 || tName2 %>
                     <% if(meta[`menu1_titulo`]) { %> <%= meta[`menu1_titulo`] %> <% } %>
                 </div>
                 
@@ -458,7 +458,7 @@
                         grouped1[plat].push(ing);
                     });
                     
-                    if (meta.soloEquivalencias) {
+                    if (meta.soloEquivalencias || menu1.tipoContenido === 'equivalencias') {
                         const allEqs = [];
                         const allLibres = [];
                         Object.values(grouped1).flat().forEach(ing => {
@@ -537,7 +537,7 @@
             <!-- Menú 2 -->
             <div class="menu-col">
                 <div class="menu-time">
-                    <%= tName %>
+                    <%= tName2 || tName1 %>
                     <% if(meta[`menu2_titulo`]) { %> <%= meta[`menu2_titulo`] %> <% } %>
                 </div>
                 
@@ -549,7 +549,7 @@
                         grouped2[plat].push(ing);
                     });
                     
-                    if (meta.soloEquivalencias) {
+                    if (meta.soloEquivalencias || menu2.tipoContenido === 'equivalencias') {
                         const allEqs = [];
                         const allLibres = [];
                         Object.values(grouped2).flat().forEach(ing => {
