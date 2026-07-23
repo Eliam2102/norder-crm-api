@@ -726,7 +726,7 @@
                         grouped1[plat].push(ing);
                     });
                     
-                    if (meta.soloEquivalencias) {
+                    if (meta.soloEquivalencias || menu1.tipoContenido === 'equivalencias') {
                         const allEqs = [];
                         const allLibres = [];
                         Object.values(grouped1).flat().forEach(ing => {
@@ -817,7 +817,7 @@
                         grouped2[plat].push(ing);
                     });
                     
-                    if (meta.soloEquivalencias) {
+                    if (meta.soloEquivalencias || menu2.tipoContenido === 'equivalencias') {
                         const allEqs = [];
                         const allLibres = [];
                         Object.values(grouped2).flat().forEach(ing => {

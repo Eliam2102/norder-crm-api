@@ -334,11 +334,13 @@ model Plan {
 }
 
 model PlanMenu {
-  id        String   @id @default(uuid())
-  planId    String   @map("plan_id")
-  nombre    String   @default("Menú #1")
-  orden     Int      @default(1)
-  createdAt DateTime @default(now()) @map("created_at")
+  id                    String   @id @default(uuid())
+  planId                String   @map("plan_id")
+  nombre                String   @default("Menú #1")
+  orden                 Int      @default(1)
+  tipoContenido         String   @default("platillos") @map("tipo_contenido")
+  barridoEquivalencias  Json?    @map("barrido_equivalencias")
+  createdAt             DateTime @default(now()) @map("created_at")
 
   plan          Plan               @relation(fields: [planId], references: [id], onDelete: Cascade)
   tiemposComida PlanTiempoComida[]
