@@ -5,6 +5,7 @@ import * as pdfService from '../services/pdf.service.js';
 import { sendPlanEmail } from '../services/email.service.js';
 import { sendPlanWhatsApp } from '../services/whatsapp.service.js';
 import { collectPlanSpellingIssues } from '../services/spellcheck.service.js';
+import { normalizeDeliveryChannels, normalizeOrchestratorChannelStatus } from '../lib/planDelivery.js';
 
 export const getAll = async (req, res, next) => {
     try {
@@ -1072,6 +1073,10 @@ export const generatePdfPreview = async (req, res, next) => {
 export const sendPlan = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const canales = normalizeDeliveryChannels(req.body);
+        if (!canales.email && !canales.whatsapp) {
+            return error(res, 'Selecciona al menos un medio de envío.', 400);
+        }
 
         // 1. Obtener plan completo con menus > tiempos > ingredientes
         const planRow = await prisma.plan.findUniqueOrThrow({
@@ -1119,16 +1124,21 @@ export const sendPlan = async (req, res, next) => {
             try {
                 const formData = new FormData();
                 formData.append('pdfPlan', new Blob([pdfBuffer], { type: 'application/pdf' }), nombreArchivo);
-                formData.append('email', paciente.email || '');
+                formData.append('email', canales.email ? (paciente.email || '') : '');
 
                 let telefonoLimpio = (paciente.telefono || '').replace(/\D/g, '');
                 if (telefonoLimpio && telefonoLimpio.length <= 10) {
                     telefonoLimpio = '52' + telefonoLimpio;
                 }
-                formData.append('telefono', telefonoLimpio);
+                formData.append('telefono', canales.whatsapp ? telefonoLimpio : '');
 
                 formData.append('paciente_nombre', paciente.nombre || '');
                 formData.append('plan_nombre', planEnriquecido.nombre || '');
+                // Contrato explícito para el workflow de N8N. Los datos del canal
+                // desactivado también viajan vacíos por compatibilidad defensiva.
+                formData.append('enviar_email', String(canales.email));
+                formData.append('enviar_whatsapp', String(canales.whatsapp));
+                formData.append('canales', JSON.stringify(canales));
 
                 console.log(`[sendPlan] Preparando envío a N8N: ${webhookUrl}`);
                 console.log(`[sendPlan] Tamaño del PDF: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
@@ -1152,8 +1162,12 @@ export const sendPlan = async (req, res, next) => {
                 // Intento parsear la respuesta por si N8N nos da un reporte de Email/WhatsApp individual
                 try {
                     const jsonRes = response.data;
+                    n8nResponseText = jsonRes;
                     console.log('[sendPlan] Respuesta N8N detallada:', jsonRes);
-                    if (jsonRes && (jsonRes.email === 'error' || jsonRes.whatsapp === 'error')) {
+                    if (jsonRes && (
+                        (canales.email && jsonRes.email === 'error')
+                        || (canales.whatsapp && jsonRes.whatsapp === 'error')
+                    )) {
                         statusMensajes = 'advertencia';
                     }
                 } catch (e) { }
@@ -1185,8 +1199,13 @@ export const sendPlan = async (req, res, next) => {
         return ok(res, {
             message: 'Plan emitido hacia el orquestador correctamente',
             orquestador: statusMensajes,
-            email: statusMensajes,     // frontend backward-compatibility
-            whatsapp: statusMensajes,  // frontend backward-compatibility
+            canales,
+            email: canales.email
+                ? normalizeOrchestratorChannelStatus(n8nResponseText, 'email', statusMensajes)
+                : 'omitido',
+            whatsapp: canales.whatsapp
+                ? normalizeOrchestratorChannelStatus(n8nResponseText, 'whatsapp', statusMensajes)
+                : 'omitido',
             plan: planActualizado
         });
 
