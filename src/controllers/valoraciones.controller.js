@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma.js';
+import { mapBioimpedancia, optionalNumber } from '../lib/bioimpedancia.js';
 import { ok } from '../utils/response.js';
 
 export const getAll = async (req, res, next) => {
@@ -155,11 +156,9 @@ export const create = async (req, res, next) => {
 
         // Bioimpedancia mappings (ensure numbers)
         if (bioimpedancia) {
-            vData.bioGrasa = bioimpedancia["Grasa %"] ? parseFloat(bioimpedancia["Grasa %"]) : undefined;
-            vData.bioMusculo = bioimpedancia["Músculo %"] ? parseFloat(bioimpedancia["Músculo %"]) : undefined;
-            vData.bioAgua = bioimpedancia["Agua %"] ? parseFloat(bioimpedancia["Agua %"]) : undefined;
-            vData.masaVisceral = bioimpedancia["Grasa Visceral"] ? parseFloat(bioimpedancia["Grasa Visceral"]) : undefined;
-            vData.edadMetabolica = bioimpedancia["Edad Metabólica"] ? parseFloat(bioimpedancia["Edad Metabólica"]) : undefined;
+            Object.assign(vData, mapBioimpedancia(bioimpedancia));
+            vData.masaVisceral = optionalNumber(bioimpedancia["Grasa Visceral"]);
+            vData.edadMetabolica = optionalNumber(bioimpedancia["Edad Metabólica"]);
         }
 
         // Bioquimicos mappings (ensure numbers)
@@ -273,8 +272,10 @@ export const getById = async (req, res, next) => {
             },
             bioimpedancia: {
                 "Grasa %": rest.bioGrasa,
-                "Músculo %": rest.bioMusculo,
                 "Agua %": rest.bioAgua,
+                "Músculo (kg)": rest.bioMusculo,
+                // Alias temporal para clientes anteriores.
+                "Músculo %": rest.bioMusculo,
                 "Grasa Visceral": rest.masaVisceral,
                 "Edad Metabólica": rest.edadMetabolica,
                 "Energía (kcal)": rest.bioEnergia,
@@ -307,6 +308,7 @@ export const update = async (req, res, next) => {
             id: _id,
             temario, temarioConsulta,
             pliegues, perimetros,
+            bioimpedancia,
             // Bio
             bioGrasa, bioAgua, bioMusculo, bioEnergia,
             // Bioq
@@ -369,11 +371,13 @@ export const update = async (req, res, next) => {
             vData.pantorrillaCorregida = perimetros.pantoCor;
         }
 
-        // Bio & Bioq
-        vData.bioGrasa = bioGrasa ?? vData.bioGrasa;
-        vData.bioAgua = bioAgua ?? vData.bioAgua;
-        vData.bioMusculo = bioMusculo ?? vData.bioMusculo;
-        vData.bioEnergia = bioEnergia ?? vData.bioEnergia;
+        // Bio & Bioq. El objeto nuevo tiene prioridad, pero se conservan los
+        // campos planos para compatibilidad con integraciones existentes.
+        const bioMapped = bioimpedancia ? mapBioimpedancia(bioimpedancia) : {};
+        if (bioMapped.bioGrasa !== undefined || bioGrasa !== undefined) vData.bioGrasa = bioMapped.bioGrasa !== undefined ? bioMapped.bioGrasa : optionalNumber(bioGrasa);
+        if (bioMapped.bioAgua !== undefined || bioAgua !== undefined) vData.bioAgua = bioMapped.bioAgua !== undefined ? bioMapped.bioAgua : optionalNumber(bioAgua);
+        if (bioMapped.bioMusculo !== undefined || bioMusculo !== undefined) vData.bioMusculo = bioMapped.bioMusculo !== undefined ? bioMapped.bioMusculo : optionalNumber(bioMusculo);
+        if (bioMapped.bioEnergia !== undefined || bioEnergia !== undefined) vData.bioEnergia = bioMapped.bioEnergia !== undefined ? bioMapped.bioEnergia : optionalNumber(bioEnergia);
         vData.glucosa = glucosa ?? vData.glucosa;
         vData.trigliceridos = trigliceridos ?? vData.trigliceridos;
         vData.colesterol = colesterol ?? vData.colesterol;
