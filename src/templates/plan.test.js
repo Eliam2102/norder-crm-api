@@ -89,6 +89,7 @@ test('incluye las cuatro filas de bioimpedancia sólo cuando existen resultados'
         bioMusculo: 31.8,
         bioEnergia: 1450,
         energia: 1450,
+        somatotipo: 'Mesomorfo',
     }], false, 'BIOIMPEDANCIA');
 
     assert.match(html, /Resultados de Bioimpedancia/);
@@ -97,4 +98,25 @@ test('incluye las cuatro filas de bioimpedancia sólo cuando existen resultados'
     assert.match(html, /Músculo \(kg\)/);
     assert.match(html, /Energía bio \(kcal\)/);
     assert.doesNotMatch(html, /Resultados Antropométricos/);
+    assert.doesNotMatch(html, /Somatotipo/);
+    assert.doesNotMatch(html, /Energía\(kcal\)/);
+    assert.doesNotMatch(html, /Mesomorfo/);
+});
+
+test('conserva somatotipo y energía del plan en antropometría', async () => {
+    const html = await renderHistory([{
+        id: 'valoracion-1',
+        fecha: new Date('2026-07-27T12:00:00Z'),
+        pctGrasaCorp: 24.3,
+        masaGrasaReal: 16.6,
+        masaMagra: 51.9,
+        energia: 1800,
+        somatotipo: 'Mesomorfo',
+    }], false, 'ANTROPOMETRIA');
+
+    assert.match(html, /Resultados Antropométricos/);
+    assert.match(html, /Somatotipo/);
+    assert.match(html, /Energía\(kcal\)/);
+    assert.match(html, /Mesomorfo/);
+    assert.doesNotMatch(html, /Resultados de Bioimpedancia/);
 });

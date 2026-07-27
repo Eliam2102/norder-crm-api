@@ -517,15 +517,15 @@
                             <td class="font-bold">Kg MLG</td>
                             <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
                         </tr>
+                        <tr>
+                            <td class="font-bold">Somatotipo</td>
+                            <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Energía(kcal)</td>
+                            <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
+                        </tr>
                     <% } %>
-                    <tr>
-                        <td class="font-bold">Somatotipo</td>
-                        <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
-                    </tr>
-                    <tr>
-                        <td class="font-bold">Energía(kcal)</td>
-                        <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
-                    </tr>
                 <% } %>
             </table>
 
