@@ -117,14 +117,6 @@ export const create = async (req, res, next) => {
             ...extra
         } = req.body;
 
-        // Si es un plan para un paciente, archivamos los anteriores
-        if (pacienteId) {
-            await prisma.plan.updateMany({
-                where: { pacienteId, estado: 'activo' },
-                data: { estado: 'archivado' }
-            });
-        }
-
         const kcal = parseFloat((calorias || 0).toString().replace(',', '.'));
         const pP = parseFloat((proteinasPct || 0).toString().replace(',', '.'));
         const cP = parseFloat((carbohidratosPct || 0).toString().replace(',', '.'));
@@ -159,8 +151,19 @@ export const create = async (req, res, next) => {
         const today = new Date();
         const defaultName = `Plan, ${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}${pacienteNombre ? `, ${pacienteNombre}` : ''}`;
 
-        const nuevoPlan = await prisma.plan.create({
-            data: {
+        // El archivado del plan anterior y la creación de toda la estructura
+        // ocurren en una sola transacción. Si falla un menú, tiempo o ingrediente,
+        // Prisma revierte también el plan nuevo y conserva activo el anterior.
+        const nuevoPlan = await prisma.$transaction(async (tx) => {
+            if (pacienteId) {
+                await tx.plan.updateMany({
+                    where: { pacienteId, estado: 'activo' },
+                    data: { estado: 'archivado' }
+                });
+            }
+
+            const createdPlan = await tx.plan.create({
+                data: {
                 nombre: nombre || nombrePlan || defaultName,
                 tipoPlan: tipoPlan || tipo || 'Balanceada',
                 calorias: Math.round(kcal),
@@ -183,58 +186,61 @@ export const create = async (req, res, next) => {
                 suplementosDetalle: suplementosDetalle || [],
                 estado: 'activo',
                 estadoEnvio: 'pendiente'
-            }
-        });
+                }
+            });
 
-        // Inserción anidada limpia
-        if (menus && Array.isArray(menus)) {
-            for (const [mIdx, mData] of menus.entries()) {
-                const menu = await prisma.planMenu.create({
-                    data: {
-                        planId: nuevoPlan.id,
-                        nombre: mData.nombre || `Menú ${mIdx + 1}`,
-                        orden: mIdx + 1,
-                        ...getMenuPersistenceData(mData)
-                    }
-                });
-
-                const tiempos = mData.tiempos || mData.tiemposComida || [];
-                for (const [tIdx, tData] of tiempos.entries()) {
-                    const tiempo = await prisma.planTiempoComida.create({
+            // Inserción anidada limpia
+            if (menus && Array.isArray(menus)) {
+                for (const [mIdx, mData] of menus.entries()) {
+                    const menu = await tx.planMenu.create({
                         data: {
-                            menuId: menu.id,
-                            nombre: tData.nombre || 'Comida',
-                            barridoTiempoId: tData.barridoTiempoId || null,
-                            orden: tIdx + 1,
-                            notaPie: tData.nota || tData.notaPie || '',
-                            bebida: tData.bebida || null,
-                            suplTiempo: tData.suplTiempo || null,
-                            suplNotas: tData.suplNotas || null
+                            planId: createdPlan.id,
+                            nombre: mData.nombre || `Menú ${mIdx + 1}`,
+                            orden: mIdx + 1,
+                            ...getMenuPersistenceData(mData)
                         }
                     });
 
-                    if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
-                        for (const [iIdx, iData] of tData.ingredientes.entries()) {
-                            await prisma.planIngrediente.create({
-                                data: {
-                                    tiempoComidaId: tiempo.id,
-                                    descripcion: iData.descripcion || '',
-                                    cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
-                                    unidad: (iData.unidad || 'gr').toLowerCase(),
-                                    eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
-                                    eqGrupo: iData.eqGrupo || '',
-                                    platillo: iData.platillo || '',
-                                    nota: iData.nota || '',
-                                    equivalencias: iData.equivalencias || null,
-                                    smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
-                                    orden: iIdx + 1
-                                }
-                            });
+                    const tiempos = mData.tiempos || mData.tiemposComida || [];
+                    for (const [tIdx, tData] of tiempos.entries()) {
+                        const tiempo = await tx.planTiempoComida.create({
+                            data: {
+                                menuId: menu.id,
+                                nombre: tData.nombre || 'Comida',
+                                barridoTiempoId: tData.barridoTiempoId || null,
+                                orden: tIdx + 1,
+                                notaPie: tData.nota || tData.notaPie || '',
+                                bebida: tData.bebida || null,
+                                suplTiempo: tData.suplTiempo || null,
+                                suplNotas: tData.suplNotas || null
+                            }
+                        });
+
+                        if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
+                            for (const [iIdx, iData] of tData.ingredientes.entries()) {
+                                await tx.planIngrediente.create({
+                                    data: {
+                                        tiempoComidaId: tiempo.id,
+                                        descripcion: iData.descripcion || '',
+                                        cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
+                                        unidad: (iData.unidad || 'gr').toLowerCase(),
+                                        eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
+                                        eqGrupo: iData.eqGrupo || '',
+                                        platillo: iData.platillo || '',
+                                        nota: iData.nota || '',
+                                        equivalencias: iData.equivalencias || null,
+                                        smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
+                                        orden: iIdx + 1
+                                    }
+                                });
+                            }
                         }
                     }
                 }
             }
-        }
+
+            return createdPlan;
+        });
 
         // ─── Auto-captura silenciosa: guarda alimentos/platillos nuevos en BD ──────
         // Se ejecuta en background sin bloquear la respuesta al cliente.
@@ -263,7 +269,7 @@ export const create = async (req, res, next) => {
                     for (const iData of allIngredientes) {
                         const desc = (iData.descripcion || '').trim();
                         if (!desc) continue;
-                        const existing = await prisma.alimentoSmae.findFirst({
+                        const existing = await prisma.alimentoSMAE.findFirst({
                             where: { nombre: { equals: desc, mode: 'insensitive' } },
                             select: { id: true }
                         });
@@ -282,7 +288,7 @@ export const create = async (req, res, next) => {
                                 'Azucar s/grasa': 'azSinGr', 'Azucar c/grasa': 'azConGr',
                             };
                             const grupo = LABEL_TO_GRUPO[iData.eqGrupo] || iData.eqGrupo.toLowerCase().replace(/[^a-z]/g, '') || 'verduras';
-                            await prisma.alimentoSmae.create({
+                            await prisma.alimentoSMAE.create({
                                 data: {
                                     nombre: desc,
                                     grupo,
@@ -448,51 +454,53 @@ export const update = async (req, res, next) => {
             if (pDate) dataUpdate.proximaSesion = pDate;
         }
 
-        // Actualización de Plan
-        await prisma.plan.update({
-            where: { id },
-            data: dataUpdate
-        });
+        // El plan y sus menús se actualizan de forma atómica. Si falla la
+        // recreación de cualquier menú, se conservan intactos los anteriores.
+        await prisma.$transaction(async (tx) => {
+            await tx.plan.update({
+                where: { id },
+                data: dataUpdate
+            });
 
-        // Si hay menus, recreamos (Garantiza integridad al editar)
-        if (menus && Array.isArray(menus)) {
-            await prisma.planMenu.deleteMany({ where: { planId: id } });
-            for (const [mIdx, mData] of menus.entries()) {
-                const menu = await prisma.planMenu.create({
-                    data: {
-                        planId: id,
-                        nombre: mData.nombre,
-                        orden: mIdx + 1,
-                        ...getMenuPersistenceData(mData)
-                    }
-                });
-                const tiempos = mData.tiempos || mData.tiemposComida || [];
-                for (const [tIdx, tData] of tiempos.entries()) {
-                    const tiempo = await prisma.planTiempoComida.create({
-                        data: { menuId: menu.id, nombre: tData.nombre, barridoTiempoId: tData.barridoTiempoId || null, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie, bebida: tData.bebida || null, suplTiempo: tData.suplTiempo || null, suplNotas: tData.suplNotas || null }
+            if (menus && Array.isArray(menus)) {
+                await tx.planMenu.deleteMany({ where: { planId: id } });
+                for (const [mIdx, mData] of menus.entries()) {
+                    const menu = await tx.planMenu.create({
+                        data: {
+                            planId: id,
+                            nombre: mData.nombre,
+                            orden: mIdx + 1,
+                            ...getMenuPersistenceData(mData)
+                        }
                     });
-                    if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
-                        for (const [iIdx, iData] of tData.ingredientes.entries()) {
-                            await prisma.planIngrediente.create({
-                                data: {
-                                    tiempoComidaId: tiempo.id,
-                                    descripcion: iData.descripcion || '',
-                                    cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
-                                    unidad: (iData.unidad || 'gr').toLowerCase(),
-                                    eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
-                                    eqGrupo: iData.eqGrupo || '',
-                                    platillo: iData.platillo || '',
-                                    nota: iData.nota || '',
-                                    equivalencias: iData.equivalencias || null,
-                                    smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
-                                    orden: iIdx + 1
-                                }
-                            });
+                    const tiempos = mData.tiempos || mData.tiemposComida || [];
+                    for (const [tIdx, tData] of tiempos.entries()) {
+                        const tiempo = await tx.planTiempoComida.create({
+                            data: { menuId: menu.id, nombre: tData.nombre, barridoTiempoId: tData.barridoTiempoId || null, orden: tIdx + 1, notaPie: tData.nota || tData.notaPie, bebida: tData.bebida || null, suplTiempo: tData.suplTiempo || null, suplNotas: tData.suplNotas || null }
+                        });
+                        if (tData.ingredientes && Array.isArray(tData.ingredientes)) {
+                            for (const [iIdx, iData] of tData.ingredientes.entries()) {
+                                await tx.planIngrediente.create({
+                                    data: {
+                                        tiempoComidaId: tiempo.id,
+                                        descripcion: iData.descripcion || '',
+                                        cantidad: iData.cantidad ? parseFloat(iData.cantidad) : 0,
+                                        unidad: (iData.unidad || 'gr').toLowerCase(),
+                                        eqCantidad: iData.eqCantidad ? parseFloat(iData.eqCantidad) : 0,
+                                        eqGrupo: iData.eqGrupo || '',
+                                        platillo: iData.platillo || '',
+                                        nota: iData.nota || '',
+                                        equivalencias: iData.equivalencias || null,
+                                        smaeGrPorEq: iData.smaeGrPorEq ? parseFloat(iData.smaeGrPorEq) : null,
+                                        orden: iIdx + 1
+                                    }
+                                });
+                            }
                         }
                     }
                 }
             }
-        }
+        });
 
         // ─── Bug #2 fix: Auto-captura silenciosa también en UPDATE ───────────────
         if (menus && Array.isArray(menus)) {
@@ -531,13 +539,13 @@ export const update = async (req, res, next) => {
                     for (const iData of allIngredientes) {
                         const desc = (iData.descripcion || '').trim();
                         if (!desc) continue;
-                        const existing = await prisma.alimentoSmae.findFirst({
+                        const existing = await prisma.alimentoSMAE.findFirst({
                             where: { nombre: { equals: desc, mode: 'insensitive' } },
                             select: { id: true }
                         });
                         if (!existing && iData.eqGrupo && parseFloat(iData.cantidad) > 0) {
                             const grupo = LABEL_TO_GRUPO[iData.eqGrupo] || iData.eqGrupo.toLowerCase().replace(/[^a-z]/g, '') || 'verduras';
-                            await prisma.alimentoSmae.create({
+                            await prisma.alimentoSMAE.create({
                                 data: {
                                     nombre: desc,
                                     grupo,
