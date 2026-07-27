@@ -461,67 +461,72 @@
                         <td><%= c && c.objetivo ? c.objetivo : '' %></td>
                     <% }); %>
                 </tr>
-                <tr>
-                    <td class="font-bold">Foto principal</td>
-                    <% cols.forEach((c, index) => { %>
-                        <td class="history-photo-cell">
-                            <% if (c && c.fotoPrincipal) { %>
-                                <img class="history-photo" src="<%= c.fotoPrincipal %>" alt="Fotografía principal de la consulta <%= index + 1 %>">
-                            <% } else if (c) { %>
-                                <span class="history-photo-empty">Sin foto</span>
-                            <% } %>
-                        </td>
-                    <% }); %>
-                </tr>
+                <% if (plan.consultaEnLinea) { %>
+                    <tr>
+                        <td class="font-bold">Foto principal</td>
+                        <% cols.forEach((c, index) => { %>
+                            <td class="history-photo-cell">
+                                <% if (c && c.fotoPrincipal) { %>
+                                    <img class="history-photo" src="<%= c.fotoPrincipal %>" alt="Fotografía principal de la consulta <%= index + 1 %>">
+                                <% } else if (c) { %>
+                                    <span class="history-photo-empty">Sin foto</span>
+                                <% } %>
+                            </td>
+                        <% }); %>
+                    </tr>
+                <% } %>
                 <tr><td colspan="8" class="font-bold text-center">Resultados Generales</td></tr>
                 <tr>
                     <td class="font-bold">Peso</td>
                     <% cols.forEach(c => { %><td><%= measurementText(c, 'peso', c?.pesoActual) %></td><% }); %>
                 </tr>
-                <tr>
-                    <td class="font-bold">Talla (cm)</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
-                </tr>
-                <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
-                <tr>
-                    <td class="font-bold">% Grasa</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'pctGrasa', c?.pctGrasaCorp) %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Kg Grasa</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'kgGrasa', c?.masaGrasaReal) %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Kg MLG</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
-                </tr>
-                <% if (hasBioimpedancia) { %>
-                    <tr><td colspan="8" class="font-bold text-center">Resultados de Bioimpedancia</td></tr>
+                <% if (!plan.consultaEnLinea) { %>
                     <tr>
-                        <td class="font-bold">Grasa (%)</td>
-                        <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioGrasa) : '' %></td><% }); %>
+                        <td class="font-bold">Talla (cm)</td>
+                        <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
+                    </tr>
+                    <% if (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia)) { %>
+                        <tr><td colspan="8" class="font-bold text-center">Resultados de Bioimpedancia</td></tr>
+                        <tr>
+                            <td class="font-bold">Grasa (%)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioGrasa) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Agua (%)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioAgua) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Músculo (kg)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioMusculo) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Energía bio (kcal)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioEnergia) : '' %></td><% }); %>
+                        </tr>
+                    <% } else { %>
+                        <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
+                        <tr>
+                            <td class="font-bold">% Grasa</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'pctGrasa', c?.pctGrasaCorp) %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Kg Grasa</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'kgGrasa', c?.masaGrasaReal) %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Kg MLG</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
+                        </tr>
+                    <% } %>
+                    <tr>
+                        <td class="font-bold">Somatotipo</td>
+                        <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
                     </tr>
                     <tr>
-                        <td class="font-bold">Agua (%)</td>
-                        <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioAgua) : '' %></td><% }); %>
-                    </tr>
-                    <tr>
-                        <td class="font-bold">Músculo (kg)</td>
-                        <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioMusculo) : '' %></td><% }); %>
-                    </tr>
-                    <tr>
-                        <td class="font-bold">Energía bio (kcal)</td>
-                        <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioEnergia) : '' %></td><% }); %>
+                        <td class="font-bold">Energía(kcal)</td>
+                        <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
                     </tr>
                 <% } %>
-                <tr>
-                    <td class="font-bold">Somatotipo</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Energía(kcal)</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
-                </tr>
             </table>
 
             <% 

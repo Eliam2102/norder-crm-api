@@ -728,6 +728,15 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
             || null
         );
         plan.consultaEnLinea = valoracionReferencia?.medicionesEstado?.consultaEnLinea === true;
+        plan.metodoComposicion = plan.consultaEnLinea
+            ? 'FOTOSCOPIA'
+            : (
+                valoracionReferencia?.medicionesEstado?.metodoComposicion
+                || ([valoracionReferencia?.bioGrasa, valoracionReferencia?.bioAgua, valoracionReferencia?.bioMusculo, valoracionReferencia?.bioEnergia]
+                    .some(value => value != null)
+                    ? 'BIOIMPEDANCIA'
+                    : 'ANTROPOMETRIA')
+            );
 
         // Reloj histórico: Solo mostramos las últimas 7.
         valoraciones = rawValoraciones.slice(0, 7);
