@@ -205,6 +205,10 @@
             display: flex;
             flex-direction: column;
         }
+        .online-followup-page .header,
+        .online-followup-page .online-followup-heading {
+            flex-shrink: 0;
+        }
         .online-followup-heading {
             display: flex;
             align-items: baseline;
@@ -223,65 +227,85 @@
             text-transform: uppercase;
             white-space: nowrap;
         }
-        .online-photo-gallery {
-            flex: 1;
-            min-height: 0;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            grid-template-rows: repeat(2, minmax(0, 1fr));
-            gap: 8px;
-            margin-bottom: 7px;
+        .online-latest-followup {
+            display: flex;
+            gap: 12px;
+            align-items: stretch;
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #222;
+            page-break-inside: avoid;
         }
-        .online-photo-gallery[data-count="1"] {
+        .online-latest-photo {
+            width: 58mm;
+            height: 58mm;
+            flex: 0 0 58mm;
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-        .online-photo-gallery[data-count="2"] {
-            grid-template-rows: minmax(0, 1fr);
-        }
-        .online-photo-card {
-            position: relative;
-            min-width: 0;
-            min-height: 0;
-            overflow: hidden;
-            border: 1px solid #222;
             background: #f5f5f5;
-            padding: 5px;
-            break-inside: avoid;
+            border: 1px solid #ddd;
+            overflow: hidden;
         }
-        .online-photo-gallery[data-count="1"] .online-photo-card {
-            width: 105mm;
-            height: 121mm;
-        }
-        .online-photo-card img {
+        .online-latest-photo img {
             display: block;
             width: 100%;
             height: 100%;
             object-fit: contain;
             object-position: center;
         }
-        .online-photo-principal {
-            position: absolute;
-            top: 7px;
-            left: 7px;
-            z-index: 1;
-            padding: 3px 6px;
-            border-radius: 999px;
-            background: rgba(0, 0, 0, .78);
-            color: #fff;
+        .online-latest-photo-empty {
+            max-width: 38mm;
+            color: #888;
+            font-size: 9px;
+            line-height: 1.35;
+            text-align: center;
+        }
+        .online-latest-summary {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-width: 0;
+        }
+        .online-latest-summary__eyebrow {
+            margin-bottom: 9px;
+            color: #666;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .online-latest-summary__title {
+            margin-bottom: 13px;
+            color: #000;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.15;
+        }
+        .online-latest-summary__data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .online-latest-summary__item {
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            background: #fafafa;
+        }
+        .online-latest-summary__label {
+            display: block;
+            margin-bottom: 3px;
+            color: #777;
             font-size: 7px;
             font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
         }
-        .online-photo-empty {
-            flex: 1;
-            min-height: 95mm;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px dashed #aaa;
-            color: #777;
-            font-size: 10px;
+        .online-latest-summary__value {
+            color: #111;
+            font-size: 11px;
+            font-weight: 700;
         }
         .online-followup-page .avoid-foods-summary {
             flex-shrink: 0;
@@ -424,6 +448,18 @@
     // Fill up to 7 columns
     const cols = Array(7).fill(null);
     hist.forEach((v, i) => { if (i < 7) cols[i] = v; });
+    const latestOnlineValuation = plan.consultaEnLinea && hist.length > 0
+        ? hist[hist.length - 1]
+        : null;
+    const hasBioimpedancia = hist.some(v =>
+        v && (
+            v.metodoComposicion === 'BIOIMPEDANCIA'
+            || v.bioGrasa != null
+            || v.bioAgua != null
+            || v.bioMusculo != null
+            || v.bioEnergia != null
+        )
+    );
 
     const measurementText = (valuation, field, value) => {
         if (!valuation) return '';
@@ -431,6 +467,12 @@
         if (status === 'NO_APLICA') return 'No aplica';
         if (value == null || value === '') return '-';
         return value;
+    };
+    const formatMeasurementNumber = (value) => {
+        if (value == null || value === '') return '-';
+        const number = Number(value);
+        if (!Number.isFinite(number)) return value;
+        return Number(number.toFixed(2));
     };
 
     const headerHTML = `
@@ -455,53 +497,17 @@
 <div class="page <%= plan.consultaEnLinea ? 'online-followup-page' : '' %>">
     <%- headerHTML %>
     <% if (plan.consultaEnLinea) { %>
-        <%
-            const fotosOnline = Array.isArray(plan.fotosSeguimientoReporte)
-                ? plan.fotosSeguimientoReporte.slice(0, 4)
-                : [];
-        %>
         <div class="online-followup-heading">
             <div class="title-name proper-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
             <div class="online-followup-badge">Consulta en línea · Seguimiento fotoscópico</div>
         </div>
-
-        <% if (fotosOnline.length > 0) { %>
-            <div class="online-photo-gallery" data-count="<%= fotosOnline.length %>">
-                <% fotosOnline.forEach((foto, index) => { %>
-                    <div class="online-photo-card">
-                        <% if (foto.esPrincipal || index === 0) { %>
-                            <span class="online-photo-principal">Principal</span>
-                        <% } %>
-                        <img src="<%= foto.dataUrl %>" alt="Fotografía de seguimiento <%= index + 1 %>">
-                    </div>
-                <% }); %>
-            </div>
-        <% } else { %>
-            <div class="online-photo-empty">Sin fotografías de seguimiento registradas.</div>
-        <% } %>
-
-        <% if (meta.showAlimentosEvitar !== false) { %>
-            <%
-                const evitarOnline = Array.isArray(plan.evitarReciente) ? plan.evitarReciente : [];
-                const evitarOnlineTexto = evitarOnline.join(' · ');
-                const evitarOnlineFontSize = evitarOnlineTexto.length > 700 ? 6.5 : evitarOnlineTexto.length > 350 ? 7.25 : 8.5;
-            %>
-            <div class="avoid-foods-summary" style="font-size: <%= evitarOnlineFontSize %>px;">
-                <span class="avoid-foods-summary__title">Alimentos a evitar / No consume / No le gustan:</span>
-                <% if (evitarOnline.length > 0) { %>
-                    <span><%= evitarOnlineTexto %></span>
-                <% } else { %>
-                    <span class="avoid-foods-summary__empty">Sin información registrada.</span>
-                <% } %>
-            </div>
-        <% } %>
     <% } else { %>
+        <div class="title-name proper-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
+    <% } %>
     <!-- Layout flex: contenido a la izquierda + imagen tipos de cuerpo a la derecha -->
     <div style="display: flex; gap: 8px; align-items: flex-start;">
         <!-- Columna izquierda: contenido -->
         <div style="flex: 1; min-width: 0;">
-            <div class="title-name proper-name">Nombre: <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
-            
             <table>
                 <tr>
                     <td class="font-bold">Fecha</td>
@@ -529,32 +535,91 @@
                     <td class="font-bold">Peso</td>
                     <% cols.forEach(c => { %><td><%= measurementText(c, 'peso', c?.pesoActual) %></td><% }); %>
                 </tr>
-                <tr>
-                    <td class="font-bold">Talla (cm)</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
-                </tr>
-                <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
-                <tr>
-                    <td class="font-bold">% Grasa</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'pctGrasa', c?.pctGrasaCorp) %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Kg Grasa</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'kgGrasa', c?.masaGrasaReal) %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Kg MLG</td>
-                    <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Somatotipo</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
-                </tr>
-                <tr>
-                    <td class="font-bold">Energía(kcal)</td>
-                    <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
-                </tr>
+                <% if (!plan.consultaEnLinea) { %>
+                    <tr>
+                        <td class="font-bold">Talla (cm)</td>
+                        <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
+                    </tr>
+                    <% if (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia)) { %>
+                        <tr><td colspan="8" class="font-bold text-center">Resultados de Bioimpedancia</td></tr>
+                        <tr>
+                            <td class="font-bold">Grasa (%)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioGrasa) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Agua (%)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioAgua) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Músculo (kg)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioMusculo) : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Energía bio (kcal)</td>
+                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioEnergia) : '' %></td><% }); %>
+                        </tr>
+                    <% } else { %>
+                        <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>
+                        <tr>
+                            <td class="font-bold">% Grasa</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'pctGrasa', c?.pctGrasaCorp) %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Kg Grasa</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'kgGrasa', c?.masaGrasaReal) %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Kg MLG</td>
+                            <% cols.forEach(c => { %><td><%= measurementText(c, 'masaMagra', c?.masaMagra) %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Somatotipo</td>
+                            <% cols.forEach(c => { %><td><%= (c && c.somatotipo) ? c.somatotipo : '' %></td><% }); %>
+                        </tr>
+                        <tr>
+                            <td class="font-bold">Energía(kcal)</td>
+                            <% cols.forEach(c => { %><td><%= (c && c.energia != null) ? c.energia : '' %></td><% }); %>
+                        </tr>
+                    <% } %>
+                <% } %>
             </table>
+
+            <% if (plan.consultaEnLinea) { %>
+                <div class="online-latest-followup">
+                    <div class="online-latest-photo">
+                        <% if (latestOnlineValuation && latestOnlineValuation.fotoPrincipal) { %>
+                            <img src="<%= latestOnlineValuation.fotoPrincipal %>" alt="Fotografía principal de la última consulta en línea">
+                        <% } else { %>
+                            <span class="online-latest-photo-empty">Sin fotografía registrada para esta consulta</span>
+                        <% } %>
+                    </div>
+                    <div class="online-latest-summary">
+                        <div class="online-latest-summary__eyebrow">Seguimiento fotoscópico</div>
+                        <div class="online-latest-summary__title">Última consulta en línea</div>
+                        <div class="online-latest-summary__data">
+                            <div class="online-latest-summary__item">
+                                <span class="online-latest-summary__label">Fecha</span>
+                                <span class="online-latest-summary__value">
+                                    <% if (latestOnlineValuation && latestOnlineValuation.fecha) {
+                                        const rawLatestDate = latestOnlineValuation.fecha instanceof Date
+                                            ? latestOnlineValuation.fecha.toISOString()
+                                            : String(latestOnlineValuation.fecha);
+                                        const parsedLatestDate = new Date(rawLatestDate.split('T')[0] + 'T12:00:00');
+                                    %>
+                                        <%= parsedLatestDate.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" }) %>
+                                    <% } else { %>
+                                        -
+                                    <% } %>
+                                </span>
+                            </div>
+                            <div class="online-latest-summary__item">
+                                <span class="online-latest-summary__label">Peso</span>
+                                <span class="online-latest-summary__value"><%= latestOnlineValuation ? measurementText(latestOnlineValuation, 'peso', latestOnlineValuation.pesoActual) : '-' %> kg</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <% } %>
 
             <% 
                const lArray = (plan.lineamientosRecientes && plan.lineamientosRecientes.length > 0)
@@ -650,21 +715,16 @@
 
         <!-- Columna derecha: Guía Tipos de Cuerpo HTML nativo -->
         <!-- Columna derecha: Imagen Tipos de Cuerpo, alineada y agrandada -->
-        <div class="side-images">
-            <% if (plan.fotoSeguimientoPrincipal) { %>
-                <div class="followup-photo" style="margin:0 auto 7px; text-align:center; break-inside:avoid;">
-                    <div style="font-size:7px; font-weight:700; margin-bottom:2px;">Seguimiento fotoscópico</div>
-                    <img src="<%= plan.fotoSeguimientoPrincipal %>" alt="Seguimiento fotoscópico" style="width:2cm; height:2cm; object-fit:contain; object-position:center; border:1px solid #222; background:#fff; padding:1px;" />
-                </div>
-            <% } %>
-            <% if (tiposCuerpoImg) { %>
-                <img class="body-types-image" src="<%= tiposCuerpoImg %>" alt="Tipos de cuerpo">
-            <% } else { %>
-                <div style="font-size:8px; font-weight:bold; color:#aaa; text-align:center; padding:10px 4px;">[Tipos de cuerpo]</div>
-            <% } %>
-        </div>
+        <% if (!plan.consultaEnLinea) { %>
+            <div class="side-images">
+                <% if (tiposCuerpoImg) { %>
+                    <img class="body-types-image" src="<%= tiposCuerpoImg %>" alt="Tipos de cuerpo">
+                <% } else { %>
+                    <div style="font-size:8px; font-weight:bold; color:#aaa; text-align:center; padding:10px 4px;">[Tipos de cuerpo]</div>
+                <% } %>
+            </div>
+        <% } %>
     </div>
-    <% } %>
 </div>
 <% } %>
 
