@@ -35,7 +35,7 @@ const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion)
     });
 };
 
-test('muestra una fotografía principal en la columna de su consulta', async () => {
+test('muestra una sola fotografía destacada de la última consulta en línea', async () => {
     const html = await renderHistory([{
         id: 'valoracion-1',
         fecha: new Date('2026-07-27T12:00:00Z'),
@@ -54,7 +54,7 @@ test('muestra una fotografía principal en la columna de su consulta', async () 
         energia: 1800,
     }], true);
 
-    assert.match(html, /Foto principal/);
+    assert.match(html, /Última consulta en línea/);
     assert.match(html, /data:image\/png;base64,AAAA/);
     assert.match(html, /Peso/);
     assert.match(html, /68.5/);
@@ -64,7 +64,40 @@ test('muestra una fotografía principal en la columna de su consulta', async () 
     assert.doesNotMatch(html, /Somatotipo/);
     assert.doesNotMatch(html, /Energía\(kcal\)/);
     assert.doesNotMatch(html, /Brazo relajado|Brazo contraído|Cintura|Cadera/);
+    assert.doesNotMatch(html, /Tipos de cuerpo/);
     assert.doesNotMatch(html, /class="online-photo-gallery"/);
+});
+
+test('ignora fotografías anteriores y usa sólo la principal de la consulta en línea más reciente', async () => {
+    const html = await renderHistory([
+        {
+            id: 'valoracion-reciente',
+            fecha: new Date('2026-07-27T12:00:00Z'),
+            fotoPrincipal: 'data:image/png;base64,RECIENTE',
+            pesoActual: 70,
+        },
+        {
+            id: 'valoracion-anterior',
+            fecha: new Date('2026-07-20T12:00:00Z'),
+            fotoPrincipal: 'data:image/png;base64,ANTERIOR',
+            pesoActual: 71,
+        },
+    ], true);
+
+    assert.match(html, /data:image\/png;base64,RECIENTE/);
+    assert.doesNotMatch(html, /data:image\/png;base64,ANTERIOR/);
+    assert.equal((html.match(/Fotografía principal de la última consulta en línea/g) || []).length, 1);
+});
+
+test('muestra un estado vacío cuando la consulta en línea no tiene fotografía', async () => {
+    const html = await renderHistory([{
+        id: 'valoracion-1',
+        fecha: new Date('2026-07-27T12:00:00Z'),
+        pesoActual: 68.5,
+    }], true);
+
+    assert.match(html, /Sin fotografía registrada para esta consulta/);
+    assert.match(html, /68.5 kg/);
 });
 
 test('no incluye fotografías en el historial presencial', async () => {
@@ -75,7 +108,7 @@ test('no incluye fotografías en el historial presencial', async () => {
         pesoActual: 68.5,
     }], false, 'ANTROPOMETRIA');
 
-    assert.doesNotMatch(html, /Foto principal/);
+    assert.doesNotMatch(html, /Última consulta en línea/);
     assert.doesNotMatch(html, /data:image\/png;base64,AAAA/);
 });
 
