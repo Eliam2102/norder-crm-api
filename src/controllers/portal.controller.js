@@ -5,10 +5,12 @@ import prisma from '../lib/prisma.js';
 import { normalizarTelefono, getContextoPaciente, hoyMexicoCity } from '../lib/pacienteContext.js';
 import {
     buildCheckoutReturnUrls,
+    buildCheckoutIdempotencyKey,
     ensureStripeCustomer,
     getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
     normalizeMembershipLevel,
+    prepareCheckoutSessionTransition,
     resolvePublicAppUrl,
     retrieveActiveSubscription,
 } from '../services/stripeCheckout.service.js';
@@ -393,6 +395,7 @@ export const crearCheckout = async (req, res) => {
                 apellido: true,
                 stripeCustomerId: true,
                 suscripcionIdExterno: true,
+                ultimaCheckoutId: true,
             }
         });
 
@@ -457,6 +460,34 @@ export const crearCheckout = async (req, res) => {
             });
         }
 
+        const checkoutTransition = await prepareCheckoutSessionTransition({
+            paciente,
+            nivel,
+            stripe,
+        });
+        if (checkoutTransition.action === 'reuse' || checkoutTransition.action === 'recover') {
+            return res.json({
+                url: checkoutTransition.url,
+                sessionId: checkoutTransition.sessionId,
+                reused: checkoutTransition.action === 'reuse',
+                recovered: checkoutTransition.action === 'recover',
+            });
+        }
+        if (checkoutTransition.action === 'paid') {
+            return res.status(409).json({
+                error: 'El pago anterior ya fue confirmado. No se generó otro cobro.',
+                code: 'checkout_pagado',
+                sessionId: checkoutTransition.sessionId,
+            });
+        }
+        if (checkoutTransition.action === 'pending') {
+            return res.status(409).json({
+                error: 'El pago anterior todavía se está confirmando. No se generó otro cobro.',
+                code: 'checkout_pendiente',
+                sessionId: checkoutTransition.sessionId,
+            });
+        }
+
         const { successUrl, cancelUrl } = buildCheckoutReturnUrls({
             baseUrl: frontendBase,
             nivel,
@@ -487,7 +518,10 @@ export const crearCheckout = async (req, res) => {
                 recovery: { enabled: true },
             },
         }, {
-            idempotencyKey: `norder-checkout-${paciente.id}-${nivel}-${attemptId}`,
+            idempotencyKey: buildCheckoutIdempotencyKey({
+                pacienteId: paciente.id,
+                previousSessionId: paciente.ultimaCheckoutId,
+            }),
         });
 
         await prisma.paciente.update({

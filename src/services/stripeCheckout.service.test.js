@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+    buildCheckoutIdempotencyKey,
     buildCheckoutReturnUrls,
     fulfillCheckoutSession,
     getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
     getSubscriptionPeriod,
     normalizeMembershipLevel,
+    prepareCheckoutSessionTransition,
     processStripeEvent,
     resolvePublicAppUrl,
     retrieveActiveSubscription,
@@ -145,6 +147,160 @@ test('construye retornos canónicos e incluye el session_id de Stripe', () => {
     }), {
         successUrl: 'https://crm-norder-health.vercel.app/norder-health/activado?session_id={CHECKOUT_SESSION_ID}',
         cancelUrl: 'https://crm-norder-health.vercel.app/norder-health/cancelado?nivel=basica',
+    });
+});
+
+test('la idempotencia usa el estado anterior y no el plan solicitado', () => {
+    assert.equal(buildCheckoutIdempotencyKey({
+        pacienteId: 'pac_123',
+        previousSessionId: null,
+    }), 'norder-checkout-pac_123-initial');
+    assert.equal(buildCheckoutIdempotencyKey({
+        pacienteId: 'pac_123',
+        previousSessionId: 'cs_previous',
+    }), 'norder-checkout-pac_123-cs_previous');
+});
+
+test('reutiliza la misma sesión abierta cuando el paciente conserva el plan', async () => {
+    let expired = false;
+    const result = await prepareCheckoutSessionTransition({
+        paciente: {
+            id: 'pac_123',
+            ultimaCheckoutId: 'cs_open',
+        },
+        nivel: 'basica',
+        stripe: {
+            checkout: {
+                sessions: {
+                    retrieve: async () => ({
+                        id: 'cs_open',
+                        status: 'open',
+                        payment_status: 'unpaid',
+                        client_reference_id: 'pac_123',
+                        metadata: { nivel: 'basica' },
+                        url: 'https://checkout.stripe.com/c/pay/cs_open',
+                    }),
+                    expire: async () => {
+                        expired = true;
+                    },
+                },
+            },
+        },
+    });
+
+    assert.deepEqual(result, {
+        action: 'reuse',
+        sessionId: 'cs_open',
+        url: 'https://checkout.stripe.com/c/pay/cs_open',
+    });
+    assert.equal(expired, false);
+});
+
+test('expira la sesión abierta anterior antes de cambiar de plan', async () => {
+    const expiredSessions = [];
+    const result = await prepareCheckoutSessionTransition({
+        paciente: {
+            id: 'pac_123',
+            ultimaCheckoutId: 'cs_basic',
+        },
+        nivel: 'premium',
+        stripe: {
+            checkout: {
+                sessions: {
+                    retrieve: async () => ({
+                        id: 'cs_basic',
+                        status: 'open',
+                        payment_status: 'unpaid',
+                        client_reference_id: 'pac_123',
+                        metadata: { nivel: 'basica' },
+                        url: 'https://checkout.stripe.com/c/pay/cs_basic',
+                    }),
+                    expire: async (sessionId) => {
+                        expiredSessions.push(sessionId);
+                        return { id: sessionId, status: 'expired' };
+                    },
+                },
+            },
+        },
+    });
+
+    assert.deepEqual(result, {
+        action: 'create',
+        expiredSessionId: 'cs_basic',
+    });
+    assert.deepEqual(expiredSessions, ['cs_basic']);
+});
+
+test('no crea otra sesión cuando el pago anterior está pendiente o pagado', async () => {
+    const makeStripe = paymentStatus => ({
+        checkout: {
+            sessions: {
+                retrieve: async () => ({
+                    id: 'cs_complete',
+                    status: 'complete',
+                    payment_status: paymentStatus,
+                    client_reference_id: 'pac_123',
+                    metadata: { nivel: 'basica' },
+                }),
+            },
+        },
+    });
+    const paciente = { id: 'pac_123', ultimaCheckoutId: 'cs_complete' };
+
+    assert.deepEqual(await prepareCheckoutSessionTransition({
+        paciente,
+        nivel: 'premium',
+        stripe: makeStripe('unpaid'),
+    }), {
+        action: 'pending',
+        sessionId: 'cs_complete',
+    });
+    assert.deepEqual(await prepareCheckoutSessionTransition({
+        paciente,
+        nivel: 'premium',
+        stripe: makeStripe('paid'),
+    }), {
+        action: 'paid',
+        sessionId: 'cs_complete',
+    });
+});
+
+test('recupera una sesión expirada solo cuando conserva el mismo plan', async () => {
+    const stripeWithRecovery = {
+        checkout: {
+            sessions: {
+                retrieve: async () => ({
+                    id: 'cs_expired',
+                    status: 'expired',
+                    payment_status: 'unpaid',
+                    client_reference_id: 'pac_123',
+                    metadata: { nivel: 'basica' },
+                    after_expiration: {
+                        recovery: {
+                            url: 'https://checkout.stripe.com/c/pay/recovery',
+                        },
+                    },
+                }),
+            },
+        },
+    };
+    const paciente = { id: 'pac_123', ultimaCheckoutId: 'cs_expired' };
+
+    assert.deepEqual(await prepareCheckoutSessionTransition({
+        paciente,
+        nivel: 'basica',
+        stripe: stripeWithRecovery,
+    }), {
+        action: 'recover',
+        sessionId: 'cs_expired',
+        url: 'https://checkout.stripe.com/c/pay/recovery',
+    });
+    assert.deepEqual(await prepareCheckoutSessionTransition({
+        paciente,
+        nivel: 'premium',
+        stripe: stripeWithRecovery,
+    }), {
+        action: 'create',
     });
 });
 

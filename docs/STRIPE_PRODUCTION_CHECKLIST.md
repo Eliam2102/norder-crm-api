@@ -68,13 +68,20 @@ Realizarla primero en modo test:
 
 1. Entrar como paciente Gratis y abrir Plan Básico.
 2. Usar **Regresar** en Stripe: debe abrir `/norder-health/cancelado`, conservar
-   el plan elegido y permitir reintentar.
-3. Completar un pago: Stripe debe regresar con `session_id`; la pantalla solo
+   el plan elegido y permitir continuar la misma sesión.
+3. Volver al portal y elegir nuevamente el mismo plan: debe regresar al mismo
+   `sessionId`, sin crear otro Checkout.
+4. Volver al portal y elegir un plan diferente: la sesión abierta anterior
+   debe quedar `expired` antes de crear la sesión del plan nuevo. El enlace
+   anterior ya no debe aceptar el pago.
+5. Si el Checkout anterior está completo pero su pago sigue pendiente, la API
+   debe responder `checkout_pendiente` y no crear otra sesión.
+6. Completar un pago: Stripe debe regresar con `session_id`; la pantalla solo
    debe decir “confirmado” después de consultar al backend.
-4. Reenviar el mismo evento desde Stripe: no debe duplicar la activación.
-5. Cortar internet después de pagar y recuperarlo: el webhook debe activar la
+7. Reenviar el mismo evento desde Stripe: no debe duplicar la activación.
+8. Cortar internet después de pagar y recuperarlo: el webhook debe activar la
    membresía y “Revisar nuevamente” debe mostrarla como confirmada.
-6. Confirmar en base de datos nivel, estado, vigencia mensual, customer,
+9. Confirmar en base de datos nivel, estado, vigencia mensual, customer,
    subscription, checkout y evento procesado.
-7. Intentar iniciar otro Checkout con la suscripción activa: debe responder
+10. Intentar iniciar otro Checkout con la suscripción activa: debe responder
    `suscripcion_activa` sin crear otro cobro.

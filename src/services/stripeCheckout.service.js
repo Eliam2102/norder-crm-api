@@ -151,6 +151,76 @@ export const retrieveActiveSubscription = async ({ paciente, stripe }) => {
     return subscriptions.data.find(item => ACTIVE_SUBSCRIPTION_STATUSES.has(item.status)) || null;
 };
 
+export const buildCheckoutIdempotencyKey = ({ pacienteId, previousSessionId }) => (
+    `norder-checkout-${pacienteId}-${previousSessionId || 'initial'}`
+);
+
+export const prepareCheckoutSessionTransition = async ({
+    paciente,
+    nivel,
+    stripe,
+}) => {
+    if (!paciente.ultimaCheckoutId) return { action: 'create' };
+
+    let previousSession;
+    try {
+        previousSession = await stripe.checkout.sessions.retrieve(paciente.ultimaCheckoutId);
+    } catch (error) {
+        if (error?.code === 'resource_missing') return { action: 'create' };
+        throw error;
+    }
+
+    const ownerId = previousSession.metadata?.pacienteId
+        || previousSession.client_reference_id;
+    if (ownerId && ownerId !== paciente.id) {
+        throw new Error(`Checkout ${previousSession.id} no pertenece al paciente.`);
+    }
+
+    const previousLevel = normalizeMembershipLevel(previousSession.metadata?.nivel);
+    if (previousSession.status === 'open') {
+        if (previousLevel === nivel && previousSession.url) {
+            return {
+                action: 'reuse',
+                sessionId: previousSession.id,
+                url: previousSession.url,
+            };
+        }
+
+        await stripe.checkout.sessions.expire(previousSession.id);
+        return {
+            action: 'create',
+            expiredSessionId: previousSession.id,
+        };
+    }
+
+    if (previousSession.status === 'expired') {
+        const recoveryUrl = previousSession.after_expiration?.recovery?.url;
+        if (previousLevel === nivel && recoveryUrl) {
+            return {
+                action: 'recover',
+                sessionId: previousSession.id,
+                url: recoveryUrl,
+            };
+        }
+        return { action: 'create' };
+    }
+
+    if (
+        previousSession.status === 'complete'
+        && PAID_CHECKOUT_STATUSES.has(previousSession.payment_status)
+    ) {
+        return {
+            action: 'paid',
+            sessionId: previousSession.id,
+        };
+    }
+
+    return {
+        action: 'pending',
+        sessionId: previousSession.id,
+    };
+};
+
 export const fulfillCheckoutSession = async ({ session, stripe, prisma, env = process.env }) => {
     if (session.mode !== 'subscription') {
         return { activated: false, reason: 'unsupported_mode' };
