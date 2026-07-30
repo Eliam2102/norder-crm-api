@@ -1,6 +1,15 @@
 import { Router } from 'express';
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
-import { loginPortal, getMe, getPlan, getMensajes, chat, crearCheckout, activarPortalManual } from '../controllers/portal.controller.js';
+import {
+    loginPortal,
+    getMe,
+    getPlan,
+    getMensajes,
+    chat,
+    crearCheckout,
+    getCheckoutStatus,
+    activarPortalManual,
+} from '../controllers/portal.controller.js';
 import { portalAuthMiddleware } from '../middlewares/portalAuth.middleware.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { listPortal as getFotos, filePortal as getFotoArchivo } from '../controllers/fotosSeguimiento.controller.js';
@@ -34,6 +43,7 @@ router.get('/fotos', portalAuthMiddleware, getFotos);
 router.get('/fotos/:fotoId/archivo', portalAuthMiddleware, getFotoArchivo);
 router.post('/chat', portalAuthMiddleware, chatLimiter, chat);
 router.post('/checkout', portalAuthMiddleware, crearCheckout);
+router.get('/checkout/session/:sessionId', portalAuthMiddleware, getCheckoutStatus);
 router.put('/activar/:id', authMiddleware, activarPortalManual);
 
 export default router;
