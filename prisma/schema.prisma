@@ -20,9 +20,12 @@ model Paciente {
   complexion           Decimal?  @db.Decimal(5, 2)
   fechaRegistro        DateTime  @default(now()) @map("fecha_registro")
   nivelMembresia       String    @default("ninguna") @map("nivel_membresia")
+  stripeCustomerId     String?   @unique @map("stripe_customer_id")
   suscripcionIdExterno String?   @map("suscripcion_id_externo")
+  suscripcionEstado    String?   @map("suscripcion_estado")
   suscripcionInicio    DateTime? @map("suscripcion_inicio") @db.Date
   suscripcionFin       DateTime? @map("suscripcion_fin") @db.Date
+  ultimaCheckoutId     String?   @map("ultima_checkout_id")
   portalActivo         Boolean   @default(false) @map("portal_activo")
 
   @@index([nivelMembresia])
@@ -590,6 +593,20 @@ model ResumenPaciente {
   paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
 
   @@map("resumen_paciente")
+}
+
+model StripeEvento {
+  id            String    @id
+  tipo          String
+  estado        String    @default("procesando")
+  intentos      Int       @default(1)
+  ultimoError   String?   @map("ultimo_error")
+  procesadoEn   DateTime? @map("procesado_en")
+  creadoEn      DateTime  @default(now()) @map("creado_en")
+  actualizadoEn DateTime  @updatedAt @map("actualizado_en")
+
+  @@index([estado, actualizadoEn])
+  @@map("stripe_evento")
 }
 
 model Cita {

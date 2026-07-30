@@ -1,7 +1,19 @@
 import jwt from 'jsonwebtoken';
 import Stripe from 'stripe';
+import { randomUUID } from 'node:crypto';
 import prisma from '../lib/prisma.js';
 import { normalizarTelefono, getContextoPaciente, hoyMexicoCity } from '../lib/pacienteContext.js';
+import {
+    buildCheckoutReturnUrls,
+    buildCheckoutIdempotencyKey,
+    ensureStripeCustomer,
+    getLatestCheckoutSessionResult,
+    getCheckoutSessionResult,
+    normalizeMembershipLevel,
+    prepareCheckoutSessionTransition,
+    resolvePublicAppUrl,
+    retrieveActiveSubscription,
+} from '../services/stripeCheckout.service.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -357,7 +369,11 @@ export const chat = async (req, res) => {
 
 export const crearCheckout = async (req, res) => {
     try {
-        const { nivel } = req.body;
+        const nivel = normalizeMembershipLevel(req.body?.nivel);
+        const requestedAttemptId = String(req.body?.attemptId || '');
+        const attemptId = /^[a-f0-9-]{16,64}$/i.test(requestedAttemptId)
+            ? requestedAttemptId
+            : randomUUID();
 
         const priceMap = {
             basica: process.env.STRIPE_PRICE_BASICA,
@@ -371,36 +387,198 @@ export const crearCheckout = async (req, res) => {
 
         const paciente = await prisma.paciente.findUnique({
             where: { id: req.paciente.id },
-            select: { telefono: true, email: true, nombre: true, apellido: true }
+            select: {
+                id: true,
+                telefono: true,
+                email: true,
+                nombre: true,
+                apellido: true,
+                stripeCustomerId: true,
+                suscripcionIdExterno: true,
+                ultimaCheckoutId: true,
+            }
         });
 
         if (!paciente) return res.status(404).json({ error: 'Paciente no encontrado.' });
 
-        const urls = (process.env.FRONTEND_URL || 'http://localhost:8080').split(',').map(u => u.trim());
-        const isProd = process.env.NODE_ENV === 'production';
-        const frontendBase = isProd
-            ? (urls.find(u => !u.includes('localhost')) ?? urls[0])
-            : (urls.find(u => u.includes('8080')) ?? urls.find(u => u.includes('localhost')) ?? urls[0]);
+        const frontendBase = resolvePublicAppUrl();
+        const activeSubscription = await retrieveActiveSubscription({ paciente, stripe });
+        if (activeSubscription) {
+            const currentLevel = normalizeMembershipLevel(activeSubscription.metadata?.nivel)
+                || (
+                    activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_BASICA
+                        ? 'basica'
+                        : activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_PREMIUM
+                            ? 'premium'
+                            : null
+                );
+            if (currentLevel === 'basica' && nivel === 'premium') {
+                const subscriptionItem = activeSubscription.items?.data?.[0];
+                if (!subscriptionItem?.id) {
+                    throw new Error('La suscripción activa no contiene un item actualizable.');
+                }
+                if (process.env.NODE_ENV === 'production' && !process.env.STRIPE_PORTAL_CONFIGURATION_ID) {
+                    throw new Error('STRIPE_PORTAL_CONFIGURATION_ID es obligatoria para actualizar planes.');
+                }
+
+                const portalSession = await stripe.billingPortal.sessions.create({
+                    customer: activeSubscription.customer,
+                    ...(process.env.STRIPE_PORTAL_CONFIGURATION_ID
+                        ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID }
+                        : {}),
+                    locale: 'es',
+                    return_url: `${frontendBase}/norder-health`,
+                    flow_data: {
+                        type: 'subscription_update_confirm',
+                        after_completion: {
+                            type: 'redirect',
+                            redirect: {
+                                return_url: `${frontendBase}/norder-health`,
+                            },
+                        },
+                        subscription_update_confirm: {
+                            subscription: activeSubscription.id,
+                            items: [{
+                                id: subscriptionItem.id,
+                                price: priceId,
+                                quantity: 1,
+                            }],
+                        },
+                    },
+                });
+                return res.json({
+                    url: portalSession.url,
+                    flow: 'subscription_update',
+                    subscriptionId: activeSubscription.id,
+                });
+            }
+
+            return res.status(409).json({
+                error: 'Ya existe una suscripción activa. No se generó un cobro nuevo.',
+                code: 'suscripcion_activa',
+                nivelActual: currentLevel,
+            });
+        }
+
+        const checkoutTransition = await prepareCheckoutSessionTransition({
+            paciente,
+            nivel,
+            stripe,
+        });
+        if (checkoutTransition.action === 'reuse' || checkoutTransition.action === 'recover') {
+            return res.json({
+                url: checkoutTransition.url,
+                sessionId: checkoutTransition.sessionId,
+                reused: checkoutTransition.action === 'reuse',
+                recovered: checkoutTransition.action === 'recover',
+            });
+        }
+        if (checkoutTransition.action === 'paid') {
+            return res.status(409).json({
+                error: 'El pago anterior ya fue confirmado. No se generó otro cobro.',
+                code: 'checkout_pagado',
+                sessionId: checkoutTransition.sessionId,
+            });
+        }
+        if (checkoutTransition.action === 'pending') {
+            return res.status(409).json({
+                error: 'El pago anterior todavía se está confirmando. No se generó otro cobro.',
+                code: 'checkout_pendiente',
+                sessionId: checkoutTransition.sessionId,
+            });
+        }
+
+        const { successUrl, cancelUrl } = buildCheckoutReturnUrls({
+            baseUrl: frontendBase,
+            nivel,
+        });
+        const customerId = await ensureStripeCustomer({ paciente, stripe, prisma });
+        const metadata = {
+            pacienteId: paciente.id,
+            telefono: paciente.telefono || '',
+            email: paciente.email || '',
+            nivel,
+            attemptId,
+        };
 
         const session = await stripe.checkout.sessions.create({
             mode: 'subscription',
             payment_method_types: ['card'],
             line_items: [{ price: priceId, quantity: 1 }],
-            metadata: {
-                pacienteId: req.paciente.id,
-                telefono: paciente.telefono || '',
-                email: paciente.email || '',
-                nivel,
+            customer: customerId,
+            client_reference_id: paciente.id,
+            metadata,
+            subscription_data: {
+                metadata,
             },
-            customer_email: paciente.email || undefined,
-            success_url: `${frontendBase}/norder-health/activado?nivel=${nivel}`,
-            cancel_url: `${frontendBase}/norder-health/cancelado`,
+            success_url: successUrl,
+            cancel_url: cancelUrl,
+            locale: 'es',
+            after_expiration: {
+                recovery: { enabled: true },
+            },
+        }, {
+            idempotencyKey: buildCheckoutIdempotencyKey({
+                pacienteId: paciente.id,
+                previousSessionId: paciente.ultimaCheckoutId,
+            }),
         });
 
-        return res.json({ url: session.url });
+        await prisma.paciente.update({
+            where: { id: paciente.id },
+            data: { ultimaCheckoutId: session.id },
+        });
+
+        return res.json({ url: session.url, sessionId: session.id });
     } catch (err) {
         console.error('[Portal] crearCheckout error:', err);
-        return res.status(500).json({ error: 'Error al crear sesión de pago.' });
+        const configError = /PUBLIC_APP_URL|STRIPE_PORTAL_CONFIGURATION_ID/.test(String(err?.message || ''));
+        return res.status(configError ? 503 : 500).json({
+            error: configError
+                ? 'Los pagos no están disponibles temporalmente por una configuración pendiente.'
+                : 'Error al crear sesión de pago.',
+            code: configError ? 'checkout_config_error' : 'checkout_error',
+        });
+    }
+};
+
+export const getCheckoutStatus = async (req, res) => {
+    try {
+        const result = await getCheckoutSessionResult({
+            sessionId: req.params.sessionId,
+            pacienteId: req.paciente.id,
+            stripe,
+            prisma,
+        });
+        return res.json(result);
+    } catch (err) {
+        console.error('[Portal] getCheckoutStatus error:', err);
+        return res.status(err.statusCode || 500).json({
+            error: err.statusCode === 403
+                ? err.message
+                : 'No se pudo confirmar el estado del pago. Intenta de nuevo.',
+            code: err.statusCode === 403 ? 'checkout_forbidden' : 'checkout_status_error',
+        });
+    }
+};
+
+export const getLatestCheckoutStatus = async (req, res) => {
+    try {
+        const result = await getLatestCheckoutSessionResult({
+            pacienteId: req.paciente.id,
+            stripe,
+            prisma,
+        });
+        return res.json(result);
+    } catch (err) {
+        console.error('[Portal] getLatestCheckoutStatus error:', err);
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            error: statusCode === 404
+                ? err.message
+                : 'No se pudo revisar el último intento de pago.',
+            code: statusCode === 404 ? 'checkout_not_found' : 'checkout_status_error',
+        });
     }
 };
 
