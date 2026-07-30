@@ -6,6 +6,7 @@ import { normalizarTelefono, getContextoPaciente, hoyMexicoCity } from '../lib/p
 import {
     buildCheckoutReturnUrls,
     ensureStripeCustomer,
+    getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
     normalizeMembershipLevel,
     resolvePublicAppUrl,
@@ -523,6 +524,26 @@ export const getCheckoutStatus = async (req, res) => {
                 ? err.message
                 : 'No se pudo confirmar el estado del pago. Intenta de nuevo.',
             code: err.statusCode === 403 ? 'checkout_forbidden' : 'checkout_status_error',
+        });
+    }
+};
+
+export const getLatestCheckoutStatus = async (req, res) => {
+    try {
+        const result = await getLatestCheckoutSessionResult({
+            pacienteId: req.paciente.id,
+            stripe,
+            prisma,
+        });
+        return res.json(result);
+    } catch (err) {
+        console.error('[Portal] getLatestCheckoutStatus error:', err);
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            error: statusCode === 404
+                ? err.message
+                : 'No se pudo revisar el último intento de pago.',
+            code: statusCode === 404 ? 'checkout_not_found' : 'checkout_status_error',
         });
     }
 };

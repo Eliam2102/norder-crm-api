@@ -7,6 +7,7 @@ import {
     getMensajes,
     chat,
     crearCheckout,
+    getLatestCheckoutStatus,
     getCheckoutStatus,
     activarPortalManual,
 } from '../controllers/portal.controller.js';
@@ -43,6 +44,7 @@ router.get('/fotos', portalAuthMiddleware, getFotos);
 router.get('/fotos/:fotoId/archivo', portalAuthMiddleware, getFotoArchivo);
 router.post('/chat', portalAuthMiddleware, chatLimiter, chat);
 router.post('/checkout', portalAuthMiddleware, crearCheckout);
+router.get('/checkout/latest', portalAuthMiddleware, getLatestCheckoutStatus);
 router.get('/checkout/session/:sessionId', portalAuthMiddleware, getCheckoutStatus);
 router.put('/activar/:id', authMiddleware, activarPortalManual);
 

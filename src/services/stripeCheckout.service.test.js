@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     buildCheckoutReturnUrls,
     fulfillCheckoutSession,
+    getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
     getSubscriptionPeriod,
     normalizeMembershipLevel,
@@ -38,6 +39,7 @@ const paidSession = {
     subscription: 'sub_123',
     client_reference_id: 'pac_123',
     metadata: { pacienteId: 'pac_123', nivel: 'premium' },
+    url: null,
 };
 
 const makePrisma = () => {
@@ -237,6 +239,103 @@ test('la página de retorno confirma la sesión con Stripe y el paciente autenti
     assert.equal(result.paymentStatus, 'paid');
     assert.equal(result.activated, true);
     assert.equal(result.membership.nivel, 'premium');
+});
+
+test('una membresía local antigua no convierte una sesión abierta en pago confirmado', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient = {
+        ...prisma.state.patient,
+        nivelMembresia: 'premium',
+        ultimaCheckoutId: 'cs_123',
+    };
+    const openStripe = {
+        ...stripe,
+        checkout: {
+            sessions: {
+                retrieve: async () => ({
+                    ...paidSession,
+                    status: 'open',
+                    payment_status: 'unpaid',
+                    subscription: null,
+                    url: 'https://checkout.stripe.com/c/pay/cs_123',
+                }),
+            },
+        },
+    };
+
+    const result = await getCheckoutSessionResult({
+        sessionId: 'cs_123',
+        pacienteId: 'pac_123',
+        stripe: openStripe,
+        prisma,
+        env,
+    });
+
+    assert.equal(result.status, 'open');
+    assert.equal(result.paymentStatus, 'unpaid');
+    assert.equal(result.activated, false);
+    assert.equal(result.continuationUrl, 'https://checkout.stripe.com/c/pay/cs_123');
+});
+
+test('recupera la última sesión desde el servidor aunque el navegador pierda su estado', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient.ultimaCheckoutId = 'cs_123';
+
+    const result = await getLatestCheckoutSessionResult({
+        pacienteId: 'pac_123',
+        stripe,
+        prisma,
+        env,
+    });
+
+    assert.equal(result.sessionId, 'cs_123');
+    assert.equal(result.activated, true);
+});
+
+test('informa cuando el paciente no tiene una sesión reciente que recuperar', async () => {
+    const prisma = makePrisma();
+    await assert.rejects(
+        getLatestCheckoutSessionResult({
+            pacienteId: 'pac_123',
+            stripe,
+            prisma,
+            env,
+        }),
+        error => error.statusCode === 404,
+    );
+});
+
+test('devuelve la URL de recuperación de una sesión expirada', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient.ultimaCheckoutId = 'cs_123';
+    const expiredStripe = {
+        ...stripe,
+        checkout: {
+            sessions: {
+                retrieve: async () => ({
+                    ...paidSession,
+                    status: 'expired',
+                    payment_status: 'unpaid',
+                    subscription: null,
+                    after_expiration: {
+                        recovery: {
+                            url: 'https://checkout.stripe.com/c/pay/recover_123',
+                        },
+                    },
+                }),
+            },
+        },
+    };
+
+    const result = await getLatestCheckoutSessionResult({
+        pacienteId: 'pac_123',
+        stripe: expiredStripe,
+        prisma,
+        env,
+    });
+
+    assert.equal(result.activated, false);
+    assert.equal(result.continuationUrl, 'https://checkout.stripe.com/c/pay/recover_123');
 });
 
 test('rechaza consultar una sesión perteneciente a otro paciente', async () => {

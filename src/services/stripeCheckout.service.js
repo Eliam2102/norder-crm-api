@@ -369,10 +369,15 @@ export const getCheckoutSessionResult = async ({
             ultimaCheckoutId: true,
         },
     });
+    const sessionIsPaid = (
+        session.status === 'complete'
+        && PAID_CHECKOUT_STATUSES.has(session.payment_status)
+    );
     const activated = Boolean(
         fulfillment?.activated
         || (
-            paciente?.ultimaCheckoutId === session.id
+            sessionIsPaid
+            && paciente?.ultimaCheckoutId === session.id
             && normalizeMembershipLevel(paciente?.nivelMembresia)
         )
     );
@@ -383,10 +388,38 @@ export const getCheckoutSessionResult = async ({
         paymentStatus: session.payment_status,
         nivel: normalizeMembershipLevel(session.metadata?.nivel),
         activated,
+        continuationUrl: session.status === 'open'
+            ? (session.url || null)
+            : (session.after_expiration?.recovery?.url || null),
         membership: paciente ? {
             nivel: normalizeMembershipLevel(paciente.nivelMembresia) || 'gratis',
             status: paciente.suscripcionEstado,
             validUntil: paciente.suscripcionFin,
         } : null,
     };
+};
+
+export const getLatestCheckoutSessionResult = async ({
+    pacienteId,
+    stripe,
+    prisma,
+    env = process.env,
+}) => {
+    const paciente = await prisma.paciente.findUnique({
+        where: { id: pacienteId },
+        select: { ultimaCheckoutId: true },
+    });
+    if (!paciente?.ultimaCheckoutId) {
+        const error = new Error('No existe una sesión de pago reciente.');
+        error.statusCode = 404;
+        throw error;
+    }
+
+    return getCheckoutSessionResult({
+        sessionId: paciente.ultimaCheckoutId,
+        pacienteId,
+        stripe,
+        prisma,
+        env,
+    });
 };
