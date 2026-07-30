@@ -65,7 +65,15 @@ const makePrisma = () => {
                 if (where.stripeCustomerId === 'cus_123') return { ...state.patient };
                 return null;
             },
-            findFirst: async () => null,
+            findFirst: async ({ where } = {}) => {
+                if (
+                    where?.suscripcionIdExterno
+                    && where.suscripcionIdExterno === state.patient.suscripcionIdExterno
+                ) {
+                    return { ...state.patient };
+                }
+                return null;
+            },
             update: async ({ data }) => {
                 state.patient = { ...state.patient, ...data };
                 state.updates.push(data);
@@ -361,6 +369,28 @@ test('detecta una suscripción activa en Stripe aunque el webhook aún no la gua
         },
     });
     assert.equal(active.id, 'sub_123');
+});
+
+test('sincroniza una suscripción histórica por su ID aunque no tenga metadata ni customer local', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient = {
+        ...prisma.state.patient,
+        stripeCustomerId: null,
+        suscripcionIdExterno: 'sub_123',
+    };
+    const result = await syncSubscription({
+        subscription: {
+            ...subscription,
+            metadata: {},
+        },
+        prisma,
+        env,
+    });
+
+    assert.equal(result.nivelMembresia, 'premium');
+    assert.equal(prisma.state.patient.nivelMembresia, 'premium');
+    assert.equal(prisma.state.patient.stripeCustomerId, 'cus_123');
+    assert.equal(prisma.state.patient.suscripcionEstado, 'active');
 });
 
 test('una cancelación baja el nivel pagado sin desactivar el acceso gratuito al portal', async () => {

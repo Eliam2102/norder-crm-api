@@ -13,6 +13,7 @@ import {
     prepareCheckoutSessionTransition,
     resolvePublicAppUrl,
     retrieveActiveSubscription,
+    syncSubscription,
 } from '../services/stripeCheckout.service.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
@@ -404,13 +405,17 @@ export const crearCheckout = async (req, res) => {
         const frontendBase = resolvePublicAppUrl();
         const activeSubscription = await retrieveActiveSubscription({ paciente, stripe });
         if (activeSubscription) {
+            const synchronizedSubscription = await syncSubscription({
+                subscription: activeSubscription,
+                prisma,
+            });
             const currentLevel = normalizeMembershipLevel(activeSubscription.metadata?.nivel)
                 || (
                     activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_BASICA
                         ? 'basica'
                         : activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_PREMIUM
                             ? 'premium'
-                            : null
+                            : normalizeMembershipLevel(synchronizedSubscription.nivelMembresia)
                 );
             if (currentLevel === 'basica' && nivel === 'premium') {
                 const subscriptionItem = activeSubscription.items?.data?.[0];
@@ -453,9 +458,11 @@ export const crearCheckout = async (req, res) => {
                 });
             }
 
-            return res.status(409).json({
-                error: 'Ya existe una suscripción activa. No se generó un cobro nuevo.',
-                code: 'suscripcion_activa',
+            return res.json({
+                url: `${frontendBase}/norder-health`,
+                flow: 'already_active',
+                message: 'Tu suscripción ya está activa. No se generó un cobro nuevo.',
+                subscriptionId: activeSubscription.id,
                 nivelActual: currentLevel,
             });
         }

@@ -97,6 +97,18 @@ const findPatientForStripeObject = async ({ object, subscription, prisma }) => {
         return prisma.paciente.findUnique({ where: { id: pacienteId } });
     }
 
+    const subscriptionId = stripeId(
+        subscription?.id
+        || object?.subscription
+        || (String(object?.id || '').startsWith('sub_') ? object.id : null)
+    );
+    if (subscriptionId) {
+        const bySubscription = await prisma.paciente.findFirst({
+            where: { suscripcionIdExterno: subscriptionId },
+        });
+        if (bySubscription) return bySubscription;
+    }
+
     const customerId = stripeId(object?.customer || subscription?.customer);
     if (customerId) {
         const byCustomer = await prisma.paciente.findUnique({ where: { stripeCustomerId: customerId } });
