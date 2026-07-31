@@ -145,6 +145,17 @@ test('exige una URL pública segura en producción', () => {
         () => resolvePublicAppUrl({ NODE_ENV: 'production', PUBLIC_APP_URL: 'http://localhost:8080' }),
         /HTTPS/,
     );
+    assert.throws(
+        () => resolvePublicAppUrl({ RAILWAY_ENVIRONMENT: 'production' }),
+        /PUBLIC_APP_URL es obligatoria/,
+    );
+    assert.throws(
+        () => resolvePublicAppUrl({
+            RAILWAY_PROJECT_ID: 'railway-project',
+            PUBLIC_APP_URL: 'http://localhost:5173',
+        }),
+        /HTTPS/,
+    );
     assert.equal(resolvePublicAppUrl(env), 'https://crm-norder-health.vercel.app');
 });
 

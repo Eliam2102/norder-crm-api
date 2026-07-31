@@ -20,7 +20,8 @@ export const normalizeMembershipLevel = (value) => {
 };
 
 export const resolvePublicAppUrl = (env = process.env) => {
-    const isProduction = env.NODE_ENV === 'production';
+    const isProduction = env.NODE_ENV === 'production'
+        || Boolean(env.RAILWAY_ENVIRONMENT || env.RAILWAY_PROJECT_ID || env.RAILWAY_SERVICE_ID);
     let candidate = env.PUBLIC_APP_URL?.trim();
 
     if (!candidate && !isProduction) {
