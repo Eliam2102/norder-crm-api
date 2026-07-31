@@ -9,11 +9,11 @@ import {
     ensureStripeCustomer,
     getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
+    levelFromStripeData,
     normalizeMembershipLevel,
     prepareCheckoutSessionTransition,
     resolvePublicAppUrl,
     retrieveActiveSubscription,
-    syncSubscription,
 } from '../services/stripeCheckout.service.js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
@@ -405,18 +405,12 @@ export const crearCheckout = async (req, res) => {
         const frontendBase = resolvePublicAppUrl();
         const activeSubscription = await retrieveActiveSubscription({ paciente, stripe });
         if (activeSubscription) {
-            const synchronizedSubscription = await syncSubscription({
-                subscription: activeSubscription,
-                prisma,
-            });
-            const currentLevel = normalizeMembershipLevel(activeSubscription.metadata?.nivel)
-                || (
-                    activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_BASICA
-                        ? 'basica'
-                        : activeSubscription.items?.data?.[0]?.price?.id === process.env.STRIPE_PRICE_PREMIUM
-                            ? 'premium'
-                            : normalizeMembershipLevel(synchronizedSubscription.nivelMembresia)
-                );
+            // Solo lectura: el nivel guardado en la BD lo escribe exclusivamente el
+            // webhook de Stripe (pago o cancelación confirmados), nunca abrir el checkout.
+            const currentLevel = levelFromStripeData({ subscription: activeSubscription });
+            if (!currentLevel) {
+                throw new Error(`No se pudo determinar el nivel de la suscripción activa ${activeSubscription.id}.`);
+            }
             if (currentLevel === 'basica' && nivel === 'premium') {
                 const subscriptionItem = activeSubscription.items?.data?.[0];
                 if (!subscriptionItem?.id) {

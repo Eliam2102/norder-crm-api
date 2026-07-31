@@ -82,12 +82,16 @@ export const getSubscriptionPeriod = (subscription) => {
 };
 
 export const levelFromStripeData = ({ metadata = {}, subscription, env = process.env }) => {
-    const metadataLevel = normalizeMembershipLevel(metadata.nivel || subscription?.metadata?.nivel);
-    if (metadataLevel) return metadataLevel;
-
+    // El precio actual de la suscripción es la fuente de verdad: refleja lo que
+    // Stripe está cobrando ahora. El metadata solo se graba al crear la suscripción
+    // y no se actualiza si el precio cambia después, así que solo se usa de respaldo.
     const priceId = subscription?.items?.data?.[0]?.price?.id;
     if (priceId && priceId === env.STRIPE_PRICE_BASICA) return 'basica';
     if (priceId && priceId === env.STRIPE_PRICE_PREMIUM) return 'premium';
+
+    const metadataLevel = normalizeMembershipLevel(metadata.nivel || subscription?.metadata?.nivel);
+    if (metadataLevel) return metadataLevel;
+
     return null;
 };
 
