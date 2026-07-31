@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
     buildCheckoutIdempotencyKey,
     buildCheckoutReturnUrls,
+    ensureStripeCustomer,
     fulfillCheckoutSession,
     getLatestCheckoutSessionResult,
     getCheckoutSessionResult,
@@ -128,6 +129,59 @@ const stripe = {
         },
     },
 };
+
+test('ensureStripeCustomer crea uno nuevo si el customer guardado ya no existe en Stripe', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient = { ...prisma.state.patient, stripeCustomerId: 'cus_deleted' };
+    const created = { id: 'cus_new' };
+    const customerStripe = {
+        customers: {
+            retrieve: async (id) => {
+                assert.equal(id, 'cus_deleted');
+                const error = new Error("No such customer: 'cus_deleted'");
+                error.code = 'resource_missing';
+                throw error;
+            },
+            create: async (_payload, options) => {
+                assert.equal(options.idempotencyKey, 'norder-customer-pac_123-replaces-cus_deleted');
+                return created;
+            },
+        },
+    };
+
+    const customerId = await ensureStripeCustomer({
+        paciente: prisma.state.patient,
+        stripe: customerStripe,
+        prisma,
+    });
+
+    assert.equal(customerId, 'cus_new');
+    assert.equal(prisma.state.patient.stripeCustomerId, 'cus_new');
+});
+
+test('ensureStripeCustomer reutiliza el customer guardado si sigue existiendo en Stripe', async () => {
+    const prisma = makePrisma();
+    prisma.state.patient = { ...prisma.state.patient, stripeCustomerId: 'cus_alive' };
+    const customerStripe = {
+        customers: {
+            retrieve: async (id) => {
+                assert.equal(id, 'cus_alive');
+                return { id: 'cus_alive', deleted: false };
+            },
+            create: async () => {
+                throw new Error('no debería crear un customer nuevo');
+            },
+        },
+    };
+
+    const customerId = await ensureStripeCustomer({
+        paciente: prisma.state.patient,
+        stripe: customerStripe,
+        prisma,
+    });
+
+    assert.equal(customerId, 'cus_alive');
+});
 
 test('normaliza los nombres históricos del plan básico', () => {
     assert.equal(normalizeMembershipLevel('basico'), 'basica');
