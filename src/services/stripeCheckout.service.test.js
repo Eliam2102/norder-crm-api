@@ -404,6 +404,22 @@ test('sincroniza una suscripción histórica por su ID aunque no tenga metadata 
     assert.equal(prisma.state.patient.suscripcionEstado, 'active');
 });
 
+test('el precio real de la suscripción manda sobre metadata vieja al sincronizar', async () => {
+    const prisma = makePrisma();
+    const result = await syncSubscription({
+        subscription: {
+            ...subscription,
+            metadata: { pacienteId: 'pac_123', nivel: 'premium' },
+            items: { data: [{ price: { id: 'price_basic' } }] },
+        },
+        prisma,
+        env,
+    });
+
+    assert.equal(result.nivelMembresia, 'basica');
+    assert.equal(prisma.state.patient.nivelMembresia, 'basica');
+});
+
 test('una cancelación baja el nivel pagado sin desactivar el acceso gratuito al portal', async () => {
     const prisma = makePrisma();
     prisma.state.patient = {
