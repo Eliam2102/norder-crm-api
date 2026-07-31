@@ -131,7 +131,19 @@ const findPatientForStripeObject = async ({ object, subscription, prisma }) => {
 };
 
 export const ensureStripeCustomer = async ({ paciente, stripe, prisma }) => {
-    if (paciente.stripeCustomerId) return paciente.stripeCustomerId;
+    let staleCustomerId = null;
+    if (paciente.stripeCustomerId) {
+        try {
+            const existing = await stripe.customers.retrieve(paciente.stripeCustomerId);
+            if (!existing.deleted) return paciente.stripeCustomerId;
+            staleCustomerId = paciente.stripeCustomerId;
+        } catch (error) {
+            if (error?.code !== 'resource_missing') throw error;
+            staleCustomerId = paciente.stripeCustomerId;
+        }
+        // El customer guardado ya no existe en Stripe (borrado a mano, u otra
+        // cuenta/clave de API). Se crea uno nuevo en vez de fallar el checkout.
+    }
 
     const customer = await stripe.customers.create({
         email: paciente.email || undefined,
@@ -139,7 +151,11 @@ export const ensureStripeCustomer = async ({ paciente, stripe, prisma }) => {
         phone: paciente.telefono || undefined,
         metadata: { pacienteId: paciente.id },
     }, {
-        idempotencyKey: `norder-customer-${paciente.id}`,
+        // Si el customer anterior ya no existe, se cambia la idempotency key para
+        // no recibir de vuelta esa misma respuesta cacheada por Stripe (24h).
+        idempotencyKey: staleCustomerId
+            ? `norder-customer-${paciente.id}-replaces-${staleCustomerId}`
+            : `norder-customer-${paciente.id}`,
     });
 
     await prisma.paciente.update({
