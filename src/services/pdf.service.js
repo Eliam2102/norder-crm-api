@@ -4,6 +4,7 @@ import path from "path";
 import prisma from "../lib/prisma.js";
 import ejs from "ejs";
 import { formatMexicoCityDateTime } from "../lib/timeZone.js";
+import { aggregatePdfMealEquivalences } from "../lib/pdfEquivalencias.js";
 
 const ASSETS_DIR = path.join(process.cwd(), "src", "assets");
 
@@ -29,6 +30,7 @@ const renderHTML = async (plan, paciente, config, valoraciones = []) => {
         tiposCuerpoImg: loadImageAsBase64("tipos_cuerpo.png"),
         logoMenuImg: loadImageAsBase64("logo-nrdr-menu.png"),
         formatMexicoCityDateTime,
+        aggregatePdfMealEquivalences,
     });
     
     return html;
