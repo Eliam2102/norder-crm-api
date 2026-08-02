@@ -322,7 +322,9 @@ export const create = async (req, res, next) => {
                                         cantidad: i.cantidad?.toString() || '0',
                                         unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
-                                        eqGrupo: i.eqGrupo || ''
+                                        eqGrupo: i.eqGrupo || '',
+                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
+                                        smaeGrPorEq: Number(i.smaeGrPorEq) || 0
                                     }))
                                 }
                             }).catch(() => { });
@@ -576,7 +578,8 @@ export const update = async (req, res, next) => {
                                         unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
                                         eqGrupo: i.eqGrupo || '',
-                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
+                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
+                                        smaeGrPorEq: Number(i.smaeGrPorEq) || 0
                                     }))
                                 }
                             }).catch(() => { });
