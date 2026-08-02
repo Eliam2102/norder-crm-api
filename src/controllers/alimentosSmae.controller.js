@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
+import { normalizeName } from '../lib/normalizeName.js';
 
 export const getAll = async (req, res, next) => {
     try {
@@ -35,6 +36,15 @@ export const create = async (req, res, next) => {
 
         if (!nombre || !grupo || pesoGramos === undefined) {
             return error(res, 'Campos requeridos: nombre, grupo, pesoGramos', 400);
+        }
+
+        // Anti-duplicado robusto: ignora acentos/mayúsculas/espacios extra, no solo
+        // coincidencia exacta de texto (evita "Clara de Huevo" vs "clara de  huevo").
+        const normalizado = normalizeName(nombre);
+        const existentes = await prisma.alimentoSMAE.findMany({ select: { id: true, nombre: true } });
+        const duplicado = existentes.find(a => normalizeName(a.nombre) === normalizado);
+        if (duplicado) {
+            return error(res, `Ya existe un alimento con este nombre: "${duplicado.nombre}"`, 409);
         }
 
         const alimento = await prisma.alimentoSMAE.create({

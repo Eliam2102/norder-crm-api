@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
+import { normalizeName } from '../lib/normalizeName.js';
 
 export const getAll = async (req, res, next) => {
     try {
@@ -29,6 +30,16 @@ export const getById = async (req, res, next) => {
 export const create = async (req, res, next) => {
     try {
         const { nombre, categoria, ingredientes } = req.body;
+
+        // Anti-duplicado robusto: ignora acentos/mayúsculas/espacios extra, no solo
+        // coincidencia exacta de texto (evita "Huevo a la Mexicana" vs "huevo a la  mexicana").
+        const normalizado = normalizeName(nombre);
+        const existentes = await prisma.platillo.findMany({ select: { id: true, nombre: true } });
+        const duplicado = existentes.find(p => normalizeName(p.nombre) === normalizado);
+        if (duplicado) {
+            return error(res, `Ya existe un platillo con este nombre: "${duplicado.nombre}"`, 409);
+        }
+
         const nuevo = await prisma.platillo.create({
             data: { nombre, categoria, ingredientes }
         });

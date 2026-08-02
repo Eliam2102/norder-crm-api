@@ -242,98 +242,9 @@ export const create = async (req, res, next) => {
             return createdPlan;
         });
 
-        // ─── Auto-captura silenciosa: guarda alimentos/platillos nuevos en BD ──────
-        // Se ejecuta en background sin bloquear la respuesta al cliente.
-        if (menus && Array.isArray(menus)) {
-            (async () => {
-                try {
-                    // Collect todos los ingredientes e platillos del payload
-                    const allIngredientes = [];
-                    const platillosMap = {}; // platilloNombre -> {categoria, ingredientes[]}
-
-                    for (const mData of menus) {
-                        const tiempos = mData.tiempos || mData.tiemposComida || [];
-                        for (const tData of tiempos) {
-                            for (const iData of (tData.ingredientes || [])) {
-                                allIngredientes.push(iData);
-                                if (iData.platillo && iData.platillo.trim() !== '') {
-                                    const pName = iData.platillo.trim();
-                                    if (!platillosMap[pName]) platillosMap[pName] = { categoria: tData.nombre || 'General', ingredientes: [] };
-                                    platillosMap[pName].ingredientes.push(iData);
-                                }
-                            }
-                        }
-                    }
-
-                    // 1. Auto-guardar alimentos SMAE personalizados
-                    for (const iData of allIngredientes) {
-                        const desc = (iData.descripcion || '').trim();
-                        if (!desc) continue;
-                        const existing = await prisma.alimentoSMAE.findFirst({
-                            where: { nombre: { equals: desc, mode: 'insensitive' } },
-                            select: { id: true }
-                        });
-                        if (!existing && iData.eqGrupo && parseFloat(iData.cantidad) > 0) {
-                            // Mapear el label de equivalencias al key interno SMAE
-                            const LABEL_TO_GRUPO = {
-                                'Verduras': 'verduras', 'Frutas': 'frutas',
-                                'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
-                                'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
-                                'Leguminosas': 'leguminosas',
-                                'AOA Muy Bajo': 'aoaMuyBajo', 'AOA Bajo': 'aoaBajo',
-                                'AOA Moderado': 'aoaModerado', 'AOA Alto': 'aoaAlto',
-                                'Leche Descrem.': 'lecheDesc', 'Leche Semi': 'lecheSemi',
-                                'Leche Entera': 'lecheEntera', 'Leche Azucarada': 'lecheAz',
-                                'Grasa s/prot': 'grasaSinProt', 'Grasa c/prot': 'grasaConProt',
-                                'Azucar s/grasa': 'azSinGr', 'Azucar c/grasa': 'azConGr',
-                            };
-                            const grupo = LABEL_TO_GRUPO[iData.eqGrupo] || iData.eqGrupo.toLowerCase().replace(/[^a-z]/g, '') || 'verduras';
-                            await prisma.alimentoSMAE.create({
-                                data: {
-                                    nombre: desc,
-                                    grupo,
-                                    pesoGramos: parseFloat(iData.cantidad) || 0,
-                                    cantidadPorcion: 1,
-                                    unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
-                                    esPersonalizado: true,
-                                    // Guardar grupos adicionales de equivalencia si existen
-                                    equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0
-                                        ? iData.equivalencias
-                                        : null
-                                }
-                            }).catch(() => { }); // Ignorar errores duplicados sin crashear
-                        }
-                    }
-
-                    // 2. Auto-guardar platillos con nombre no-genérico
-                    for (const [pName, pData] of Object.entries(platillosMap)) {
-                        if (!pName || pName.toLowerCase().includes('nuevo platillo')) continue;
-                        const existePlatillo = await prisma.platillo.findFirst({
-                            where: { nombre: { equals: pName, mode: 'insensitive' } },
-                            select: { id: true }
-                        });
-                        if (!existePlatillo) {
-                            await prisma.platillo.create({
-                                data: {
-                                    nombre: pName,
-                                    categoria: pData.categoria,
-                                    ingredientes: pData.ingredientes.map(i => ({
-                                        descripcion: i.descripcion || '',
-                                        cantidad: i.cantidad?.toString() || '0',
-                                        unidad: (i.unidad || 'gr').toLowerCase(),
-                                        eqCantidad: i.eqCantidad?.toString() || null,
-                                        eqGrupo: i.eqGrupo || ''
-                                    }))
-                                }
-                            }).catch(() => { });
-                        }
-                    }
-                } catch (autoErr) {
-                    console.warn('[AutoCapture] Error silencioso al guardar alimentos/platillos:', autoErr.message);
-                }
-            })();
-        }
-        // ─────────────────────────────────────────────────────────────────────────
+        // Auto-captura silenciosa eliminada: el catálogo SMAE y los platillos
+        // se gestionan exclusivamente desde sus propios módulos (Equivalencias y Biblioteca de Platillos).
+        // No se debe crear nada automáticamente al guardar un menú de paciente.
 
         const planFinal = await prisma.plan.findUnique({
             where: { id: nuevoPlan.id },
@@ -502,91 +413,9 @@ export const update = async (req, res, next) => {
             }
         });
 
-        // ─── Bug #2 fix: Auto-captura silenciosa también en UPDATE ───────────────
-        if (menus && Array.isArray(menus)) {
-            (async () => {
-                try {
-                    const allIngredientes = [];
-                    const platillosMap = {};
-
-                    for (const mData of menus) {
-                        const tiempos = mData.tiempos || mData.tiemposComida || [];
-                        for (const tData of tiempos) {
-                            for (const iData of (tData.ingredientes || [])) {
-                                allIngredientes.push(iData);
-                                if (iData.platillo && iData.platillo.trim() !== '') {
-                                    const pName = iData.platillo.trim();
-                                    if (!platillosMap[pName]) platillosMap[pName] = { categoria: tData.nombre || 'General', ingredientes: [] };
-                                    platillosMap[pName].ingredientes.push(iData);
-                                }
-                            }
-                        }
-                    }
-
-                    const LABEL_TO_GRUPO = {
-                        'Verduras': 'verduras', 'Frutas': 'frutas',
-                        'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
-                        'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
-                        'Leguminosas': 'leguminosas',
-                        'AOA Muy Bajo': 'aoaMuyBajo', 'AOA Bajo': 'aoaBajo',
-                        'AOA Moderado': 'aoaModerado', 'AOA Alto': 'aoaAlto',
-                        'Leche Descrem.': 'lecheDesc', 'Leche Semi': 'lecheSemi',
-                        'Leche Entera': 'lecheEntera', 'Leche Azucarada': 'lecheAz',
-                        'Grasa s/prot': 'grasaSinProt', 'Grasa c/prot': 'grasaConProt',
-                        'Azucar s/grasa': 'azSinGr', 'Azucar c/grasa': 'azConGr',
-                    };
-
-                    for (const iData of allIngredientes) {
-                        const desc = (iData.descripcion || '').trim();
-                        if (!desc) continue;
-                        const existing = await prisma.alimentoSMAE.findFirst({
-                            where: { nombre: { equals: desc, mode: 'insensitive' } },
-                            select: { id: true }
-                        });
-                        if (!existing && iData.eqGrupo && parseFloat(iData.cantidad) > 0) {
-                            const grupo = LABEL_TO_GRUPO[iData.eqGrupo] || iData.eqGrupo.toLowerCase().replace(/[^a-z]/g, '') || 'verduras';
-                            await prisma.alimentoSMAE.create({
-                                data: {
-                                    nombre: desc,
-                                    grupo,
-                                    pesoGramos: parseFloat(iData.cantidad) || 0,
-                                    cantidadPorcion: 1,
-                                    unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
-                                    esPersonalizado: true,
-                                    equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0 ? iData.equivalencias : null
-                                }
-                            }).catch(() => { });
-                        }
-                    }
-
-                    for (const [pName, pData] of Object.entries(platillosMap)) {
-                        if (!pName || pName.toLowerCase().includes('nuevo platillo')) continue;
-                        const existePlatillo = await prisma.platillo.findFirst({
-                            where: { nombre: { equals: pName, mode: 'insensitive' } },
-                            select: { id: true }
-                        });
-                        if (!existePlatillo) {
-                            await prisma.platillo.create({
-                                data: {
-                                    nombre: pName,
-                                    categoria: pData.categoria,
-                                    ingredientes: pData.ingredientes.map(i => ({
-                                        descripcion: i.descripcion || '',
-                                        cantidad: i.cantidad?.toString() || '0',
-                                        unidad: (i.unidad || 'gr').toLowerCase(),
-                                        eqCantidad: i.eqCantidad?.toString() || null,
-                                        eqGrupo: i.eqGrupo || '',
-                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
-                                    }))
-                                }
-                            }).catch(() => { });
-                        }
-                    }
-                } catch (autoErr) {
-                    console.warn('[AutoCapture/Update] Error silencioso:', autoErr.message);
-                }
-            })();
-        }
+        // Auto-captura silenciosa eliminada: el catálogo SMAE y los platillos
+        // se gestionan exclusivamente desde sus propios módulos (Equivalencias y Biblioteca de Platillos).
+        // No se debe crear nada automáticamente al guardar un menú de paciente.
         // ─────────────────────────────────────────────────────────────────────────
 
         const planFinal = await prisma.plan.findUnique({
