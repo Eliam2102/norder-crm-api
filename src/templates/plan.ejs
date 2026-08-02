@@ -787,28 +787,12 @@
                     });
                     
                     if (meta.soloEquivalencias || menu1.tipoContenido === 'equivalencias') {
-                        const allEqs = [];
-                        const allLibres = [];
-                        Object.values(grouped1).flat().forEach(ing => {
-                            const eqsM1Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
-                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
-                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
-                            
-                            // Filtramos las que son "libre" para no mostrarlas como equivalencia numérica
-                            const eqsM1 = eqsM1Raw.filter(e => parseFloat(e.cantidad) > 0 && !String(e.grupo).toLowerCase().includes('libre'));
-                            const hasLibre = eqsM1Raw.some(e => String(e.grupo).toLowerCase().includes('libre'));
-
-                            if (eqsM1.length > 0) {
-                                allEqs.push(eqsM1.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + '));
-                            }
-                            // Si el ingrediente fue marcado como libre o no generó ninguna equivalencia real
-                            if (hasLibre || (eqsM1.length === 0 && ing.descripcion)) {
-                                allLibres.push(ing);
-                            }
-                        });
+                        const summaryM1 = aggregatePdfMealEquivalences(Object.values(grouped1).flat());
+                        const allEqs = summaryM1.lines;
+                        const allLibres = summaryM1.freeIngredients;
                         
                         allEqs.forEach(eq => { %>
-                            <div class="menu-item"><%= eq %></div>
+                            <div class="menu-item"><%= eq.amount %> eq <%= eq.group %></div>
                         <% }); 
                         
                         if (allLibres.length > 0) { %>
@@ -878,27 +862,12 @@
                     });
                     
                     if (meta.soloEquivalencias || menu2.tipoContenido === 'equivalencias') {
-                        const allEqs = [];
-                        const allLibres = [];
-                        Object.values(grouped2).flat().forEach(ing => {
-                            const eqsM2Raw = Array.isArray(ing.equivalencias) && ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null).length > 0
-                                ? ing.equivalencias.filter(e => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null)
-                                : (ing.eqCantidad && ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
-                            
-                            const eqsM2 = eqsM2Raw.filter(e => parseFloat(e.cantidad) > 0 && !String(e.grupo).toLowerCase().includes('libre'));
-                            const hasLibre = eqsM2Raw.some(e => String(e.grupo).toLowerCase().includes('libre'));
-
-                            if (eqsM2.length > 0) {
-                                allEqs.push(eqsM2.map(e => `${e.cantidad} eq ${e.grupo}`).join(' + '));
-                            }
-                            
-                            if (hasLibre || (eqsM2.length === 0 && ing.descripcion)) {
-                                allLibres.push(ing);
-                            }
-                        });
+                        const summaryM2 = aggregatePdfMealEquivalences(Object.values(grouped2).flat());
+                        const allEqs = summaryM2.lines;
+                        const allLibres = summaryM2.freeIngredients;
                         
                         allEqs.forEach(eq => { %>
-                            <div class="menu-item"><%= eq %></div>
+                            <div class="menu-item"><%= eq.amount %> eq <%= eq.group %></div>
                         <% }); 
                         
                         if (allLibres.length > 0) { %>
