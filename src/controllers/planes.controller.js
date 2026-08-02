@@ -292,9 +292,8 @@ export const create = async (req, res, next) => {
                                 data: {
                                     nombre: desc,
                                     grupo,
-                                    equivalentesBase: parseFloat(iData.eqCantidad) || 1,
                                     pesoGramos: parseFloat(iData.cantidad) || 0,
-                                    cantidadPorcion: parseFloat(iData.cantidad) || 1,
+                                    cantidadPorcion: 1,
                                     unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
                                     esPersonalizado: true,
                                     // Guardar grupos adicionales de equivalencia si existen
@@ -323,9 +322,7 @@ export const create = async (req, res, next) => {
                                         cantidad: i.cantidad?.toString() || '0',
                                         unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
-                                        eqGrupo: i.eqGrupo || '',
-                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
-                                        smaeGrPorEq: Number(i.smaeGrPorEq) || 0
+                                        eqGrupo: i.eqGrupo || ''
                                     }))
                                 }
                             }).catch(() => { });
@@ -552,9 +549,8 @@ export const update = async (req, res, next) => {
                                 data: {
                                     nombre: desc,
                                     grupo,
-                                    equivalentesBase: parseFloat(iData.eqCantidad) || 1,
                                     pesoGramos: parseFloat(iData.cantidad) || 0,
-                                    cantidadPorcion: parseFloat(iData.cantidad) || 1,
+                                    cantidadPorcion: 1,
                                     unidadPorcion: (iData.unidad || 'pz').toLowerCase(),
                                     esPersonalizado: true,
                                     equivalencias: Array.isArray(iData.equivalencias) && iData.equivalencias.length > 0 ? iData.equivalencias : null
@@ -580,8 +576,7 @@ export const update = async (req, res, next) => {
                                         unidad: (i.unidad || 'gr').toLowerCase(),
                                         eqCantidad: i.eqCantidad?.toString() || null,
                                         eqGrupo: i.eqGrupo || '',
-                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
-                                        smaeGrPorEq: Number(i.smaeGrPorEq) || 0
+                                        equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
                                     }))
                                 }
                             }).catch(() => { });
