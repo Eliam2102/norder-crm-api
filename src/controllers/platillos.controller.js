@@ -1,6 +1,45 @@
 import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
 import { normalizeName } from '../lib/normalizeName.js';
+import { resolveIngredienteContraSmae, normalizarNombre } from '../utils/resolveIngredienteSmae.js';
+
+// Resuelve los ingredientes de cada platillo contra el catálogo AlimentoSMAE vigente,
+// para que la biblioteca siempre muestre datos frescos aunque el catálogo haya cambiado
+// después de que el platillo fue creado. Ver plan: declarative-wibbling-matsumoto.
+const resolverPlatillos = async (platillos) => {
+    const catalogo = await prisma.alimentoSMAE.findMany();
+    const byId = new Map(catalogo.map((a) => [a.id, a]));
+    const byNombre = new Map();
+    for (const a of catalogo) {
+        const key = normalizarNombre(a.nombre);
+        if (!byNombre.has(key)) byNombre.set(key, []);
+        byNombre.get(key).push(a);
+    }
+
+    const healUpdates = [];
+    const resultado = platillos.map((p) => {
+        let healedSomething = false;
+        const nuevosIngs = (p.ingredientes || []).map((ing) => {
+            const { ingrediente, healedId } = resolveIngredienteContraSmae(ing, byId, byNombre);
+            if (healedId) healedSomething = true;
+            return ingrediente;
+        });
+        if (healedSomething) healUpdates.push({ platilloId: p.id, ingredientes: nuevosIngs });
+        return { ...p, ingredientes: nuevosIngs };
+    });
+
+    // Self-healing perezoso: persiste en background los alimentoSmaeId recién resueltos
+    // por nombre, sin bloquear ni fallar la respuesta si algo sale mal.
+    if (healUpdates.length > 0) {
+        Promise.all(
+            healUpdates.map((u) =>
+                prisma.platillo.update({ where: { id: u.platilloId }, data: { ingredientes: u.ingredientes } })
+            )
+        ).catch((err) => console.error('[platillos] self-heal alimentoSmaeId falló:', err));
+    }
+
+    return resultado;
+};
 
 export const getAll = async (req, res, next) => {
     try {
@@ -10,7 +49,8 @@ export const getAll = async (req, res, next) => {
             where,
             orderBy: { nombre: 'asc' }
         });
-        return ok(res, platillos);
+        const resueltos = await resolverPlatillos(platillos);
+        return ok(res, resueltos);
     } catch (err) {
         next(err);
     }
@@ -21,7 +61,8 @@ export const getById = async (req, res, next) => {
         const platillo = await prisma.platillo.findUniqueOrThrow({
             where: { id: req.params.id }
         });
-        return ok(res, platillo);
+        const [resuelto] = await resolverPlatillos([platillo]);
+        return ok(res, resuelto);
     } catch (err) {
         next(err);
     }
