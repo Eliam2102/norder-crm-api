@@ -53,7 +53,12 @@ export const resolveIngredienteContraSmae = (ing, byId, byNombre) => {
         return { ingrediente: ing, healedId: null };
     }
 
-    const nuevoAncla = match.pesoGramos;
+    // El ancla real es la porción de referencia dividida entre cuántas equivalencias
+    // aporta esa porción (mismo criterio que amountPerBaseEquivalent() en
+    // Frontend/.../smaeCatalogScaling.ts). Usar match.pesoGramos a secas rompía los
+    // alimentos con equivalentesBase != 1 (ej. 1 SERV = 3 EQ se leía como 1 SERV = 1 EQ).
+    const equivalentesBase = Number(match.equivalentesBase) > 0 ? Number(match.equivalentesBase) : 1;
+    const nuevoAncla = match.pesoGramos / equivalentesBase;
     const grupoLabel = GRUPO_LABELS[match.grupo] || match.grupo;
 
     // Mantener fijo el número de Eq guardado y recalcular la cantidad con el ancla actual
