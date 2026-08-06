@@ -732,16 +732,61 @@
 <!-- PAGE 2: MENUS -->
 <% if (showMenus) { %>
 <%
-    // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida haya
+    // Cuenta cuántas "líneas" de contenido ocupará un tiempo de comida (título +
+    // nombres de platillo + ingredientes/equivalencias + nota/bebida/suplemento),
+    // para poder repartir el alto de cada fila proporcionalmente en vez de parejo.
+    const countTiempoLines = (tMenu, soloEq) => {
+        let lines = 1; // título del tiempo de comida
+        if (!tMenu || !tMenu.ingredientes || tMenu.ingredientes.length === 0) return lines;
+        const grouped = {};
+        tMenu.ingredientes.forEach(ing => {
+            const plat = ing.platillo || '';
+            if (!grouped[plat]) grouped[plat] = [];
+            grouped[plat].push(ing);
+        });
+        if (soloEq) {
+            const summary = aggregatePdfMealEquivalences(Object.values(grouped).flat());
+            lines += summary.lines.length + summary.freeIngredients.length;
+        } else {
+            Object.keys(grouped).forEach(plat => {
+                if (plat) lines += 1; // encabezado del platillo
+                lines += grouped[plat].length;
+            });
+        }
+        if (tMenu.notaPie) lines += 1;
+        if (tMenu.bebida) lines += 1;
+        if (tMenu.suplTiempo) lines += 1;
+        return lines;
+    };
+
+    // Resuelve cada fila una sola vez (tiempo + ambos menús + peso proporcional)
+    const menuRows = timeNames.map(tRow => {
+        const tMenu1 = menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null;
+        const tMenu2 = menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null;
+        const soloEq1 = !!(menu1 && (meta.soloEquivalencias || menu1.tipoContenido === 'equivalencias'));
+        const soloEq2 = !!(menu2 && (meta.soloEquivalencias || menu2.tipoContenido === 'equivalencias'));
+        // Mínimo 2 para que los tiempos con poco contenido no queden ilegibles.
+        const weight = Math.max(countTiempoLines(tMenu1, soloEq1), countTiempoLines(tMenu2, soloEq2), 2);
+        return { tRow, tMenu1, tMenu2, soloEq1, soloEq2, weight };
+    });
+
+    // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida
+    // haya Y qué tan cargada esté la fila más densa, para reducir el riesgo de que
+    // esa fila no quepa en el espacio que le toca aunque ya reciba más proporción.
     const _nT = timeNames.length;
-    // Factor de escala: 1.0 para ≤4, baja gradualmente hasta 0.58 para 9+
-    const _fS = _nT <= 3 ? 1.0
-              : _nT === 4 ? 0.95
-              : _nT === 5 ? 0.87
-              : _nT === 6 ? 0.79
-              : _nT === 7 ? 0.71
-              : _nT === 8 ? 0.64
-              : 0.58;
+    const _peakWeight = menuRows.reduce((max, r) => Math.max(max, r.weight), 2);
+    // Factor de escala base según número de tiempos de comida: 1.0 para ≤4, baja hasta 0.58 para 9+
+    let _fS = _nT <= 3 ? 1.0
+            : _nT === 4 ? 0.95
+            : _nT === 5 ? 0.87
+            : _nT === 6 ? 0.79
+            : _nT === 7 ? 0.71
+            : _nT === 8 ? 0.64
+            : 0.58;
+    // Ajuste adicional si la fila más cargada tiene muchas líneas relativas al resto
+    if (_peakWeight > 10) _fS *= 0.9;
+    if (_peakWeight > 14) _fS *= 0.9;
+    _fS = Math.max(_fS, 0.45);
     const _pad  = _nT > 5 ? '3px 4px' : '5px 6px';
     const _mbI  = _nT > 6 ? '1px' : '2px';
     const _mtN  = _nT > 5 ? '2px' : '4px';
@@ -766,11 +811,9 @@
         </div>
         
         <%
-        timeNames.forEach(tRow => {
-            const tMenu1 = menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null;
-            const tMenu2 = menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null;
+        menuRows.forEach(({ tRow, tMenu1, tMenu2, weight }) => {
         %>
-        <div class="menu-row">
+        <div class="menu-row" style="flex: <%- weight %> 1 0;">
             <!-- Menú 1 -->
             <div class="menu-col">
                 <div class="menu-time">
