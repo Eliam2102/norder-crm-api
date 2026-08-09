@@ -2,6 +2,51 @@ import prisma from '../lib/prisma.js';
 import { mapBioimpedancia, optionalNumber } from '../lib/bioimpedancia.js';
 import { ok } from '../utils/response.js';
 
+// Todas las columnas Decimal/Int de Valoracion que create()/update() dejan
+// pasar sin sanitizar vía el spread `...rest`. Ningún caller actual manda ""
+// para estas, pero si alguno lo hiciera Prisma tronaría (igual que el bug de
+// "estatura" en pacientes) y tumbaría el resto de la actualización con él.
+// Se sanea justo antes de tocar Prisma, sin tocar el resto de la lógica.
+const DECIMAL_FIELDS = [
+    'pesoActual', 'estatura', 'imc',
+    'pliegeTricep', 'pliegeBicep', 'pliegueSubescapular', 'pliegueCrestaIliaca',
+    'pliegueSupraespinal', 'pliegueAbdominal', 'pliegueMusloFrontal', 'plieguePantorrilla', 'sumaPliegues',
+    'perimetroMuneca', 'perimetroBrazoRelajado', 'perimetroBrazoContraido', 'perimetroPectoral', 'perimetroCintura',
+    'perimetroAbdomen', 'perimetroCadera', 'perimetroMusloFrontal', 'perimetroPantorrilla',
+    'brazoCorregido', 'piernaCorregida', 'pantorrillaCorregida',
+    'diametroBiestiloideo', 'diametroBiepicondHumero', 'diametroBiepicondFemur',
+    'bioGrasa', 'bioAgua', 'bioMusculo', 'bioEnergia',
+    'glucosa', 'trigliceridos', 'colesterol', 'creatinina', 'acidoUrico',
+    'pctGrasa2comp', 'kgGrasa2comp', 'kgMasaMagra2comp',
+    'superficieCorporal', 'superficieCorp', 'pctGrasaCorporal4comp', 'pctGrasaCorp', 'masaGrasaReal',
+    'pctGrasaIdeal', 'masaGrasaIdeal', 'masaVisceral', 'masaOsea', 'pctMasaOsea', 'pctMasaVisceral',
+    'masaMuscular', 'pctMasaMuscular', 'pctMusculoIdeal', 'musculoIdeal', 'masaMagra',
+    'deficitMusculo', 'deficitCalorico', 'pesoIdeal', 'pesoIdeal4comp', 'ptMin', 'ptMax', 'pesoAjustado',
+    'sobrepeso', 'indiceProporcionalidad', 'endomorfico', 'mesomorfico', 'ectomorfico',
+    'indicePonderal', 'complexion', 'densidad2comp', 'edadMetabolica',
+];
+const INT_FIELDS = ['numeroValoracion', 'frecuenciaCardiaca'];
+
+const numOrNull = (v) => {
+    if (v === '' || v === undefined || v === null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
+const sanitizeValoracionNumerics = (data) => {
+    const out = { ...data };
+    for (const field of DECIMAL_FIELDS) {
+        if (typeof out[field] === 'string') out[field] = numOrNull(out[field]);
+    }
+    for (const field of INT_FIELDS) {
+        if (typeof out[field] === 'string') {
+            out[field] = out[field] === '' ? null : parseInt(out[field], 10);
+            if (Number.isNaN(out[field])) out[field] = null;
+        }
+    }
+    return out;
+};
+
 export const getAll = async (req, res, next) => {
     try {
         const { pacienteId } = req.params;
@@ -170,9 +215,11 @@ export const create = async (req, res, next) => {
             vData.creatinina = bioquimicos.Creat ? parseFloat(bioquimicos.Creat) : undefined;
         }
 
+        const safeVData = sanitizeValoracionNumerics(vData);
+
         const valoracion = await prisma.valoracion.create({
             data: {
-                ...vData,
+                ...safeVData,
                 pacienteId,
                 numeroValoracion,
                 fecha: req.body.fecha ? new Date(req.body.fecha) : new Date(),
@@ -314,7 +361,7 @@ export const update = async (req, res, next) => {
             // Bioq
             glucosa, trigliceridos, colesterol, creatinina, acidoUrico,
             // Aliases
-            deficitMuscular, talla,
+            deficitMuscular, talla, peso,
             createdAt, updatedAt,
             suplementosDetalle,
             // Nuevo payload simplificado del frontend (no son columnas, se mapean abajo)
@@ -322,7 +369,7 @@ export const update = async (req, res, next) => {
             ...rest
         } = req.body;
 
-        const pesoVal = rest.pesoActual ?? (rest.peso ? parseFloat(rest.peso) : undefined);
+        const pesoVal = rest.pesoActual ?? (peso ? parseFloat(peso) : undefined);
         const pctGrasaVal = rest.pctGrasa2comp ?? (pctGrasa !== undefined ? parseFloat(pctGrasa) : undefined);
 
         const vData = { ...rest };
@@ -378,11 +425,13 @@ export const update = async (req, res, next) => {
         if (bioMapped.bioAgua !== undefined || bioAgua !== undefined) vData.bioAgua = bioMapped.bioAgua !== undefined ? bioMapped.bioAgua : optionalNumber(bioAgua);
         if (bioMapped.bioMusculo !== undefined || bioMusculo !== undefined) vData.bioMusculo = bioMapped.bioMusculo !== undefined ? bioMapped.bioMusculo : optionalNumber(bioMusculo);
         if (bioMapped.bioEnergia !== undefined || bioEnergia !== undefined) vData.bioEnergia = bioMapped.bioEnergia !== undefined ? bioMapped.bioEnergia : optionalNumber(bioEnergia);
-        vData.glucosa = glucosa ?? vData.glucosa;
-        vData.trigliceridos = trigliceridos ?? vData.trigliceridos;
-        vData.colesterol = colesterol ?? vData.colesterol;
-        vData.creatinina = creatinina ?? vData.creatinina;
-        vData.acidoUrico = acidoUrico ?? vData.acidoUrico;
+        // `??` no filtra "" (solo null/undefined) — un valor vacío explícito
+        // llegaría crudo a un campo Decimal y tronaría igual que "estatura".
+        if (glucosa !== undefined) vData.glucosa = numOrNull(glucosa);
+        if (trigliceridos !== undefined) vData.trigliceridos = numOrNull(trigliceridos);
+        if (colesterol !== undefined) vData.colesterol = numOrNull(colesterol);
+        if (creatinina !== undefined) vData.creatinina = numOrNull(creatinina);
+        if (acidoUrico !== undefined) vData.acidoUrico = numOrNull(acidoUrico);
 
         // Temario: el frontend manda el array completo en cada edición (incluye notas de
         // Competencia como ítem __COMPETENCIA_NOTES__). Antes se descartaba en el update
@@ -403,9 +452,11 @@ export const update = async (req, res, next) => {
             };
         }
 
+        const safeVData = sanitizeValoracionNumerics(vData);
+
         const updated = await prisma.valoracion.update({
             where: { id },
-            data: vData,
+            data: safeVData,
             include: { temarioConsulta: true }
         });
         return ok(res, updated);
