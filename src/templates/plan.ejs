@@ -460,6 +460,15 @@
             || v.bioEnergia != null
         )
     );
+    // Tabla comparativa de histórico solo aporta valor cuando hay más de un
+    // tipo de consulta (p.ej. presencial + en línea mezcladas). Si el paciente
+    // solo tiene consultas en línea, esa info ya se muestra en el bloque de
+    // seguimiento fotoscópico y repetirla en la tabla es redundante.
+    const tiposConsultaHist = new Set(
+        hist.filter(Boolean).map(v => (v.medicionesEstado && v.medicionesEstado.consultaEnLinea === true) ? 'online' : 'presencial')
+    );
+    const hasMixedModalidad = tiposConsultaHist.size > 1;
+    const showHistoryTable = !plan.consultaEnLinea || hasMixedModalidad;
 
     const measurementText = (valuation, field, value) => {
         if (!valuation) return '';
@@ -508,6 +517,7 @@
     <div style="display: flex; gap: 8px; align-items: flex-start;">
         <!-- Columna izquierda: contenido -->
         <div style="flex: 1; min-width: 0;">
+            <% if (showHistoryTable) { %>
             <table>
                 <tr>
                     <td class="font-bold">Fecha</td>
@@ -583,6 +593,7 @@
                     <% } %>
                 <% } %>
             </table>
+            <% } %>
 
             <% if (plan.consultaEnLinea) { %>
                 <div class="online-latest-followup">
