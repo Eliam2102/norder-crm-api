@@ -305,20 +305,39 @@ export const update = async (req, res, next) => {
             notasGenerales,
             notas,
             suplementosDetalle,
+            valoracionId,
             ...extra
         } = req.body;
 
-        const kcal = parseFloat((calorias || 0).toString().replace(',', '.'));
-        const pP = parseFloat((proteinasPct || 0).toString().replace(',', '.'));
-        const cP = parseFloat((carbohidratosPct || 0).toString().replace(',', '.'));
-        const gP = parseFloat((grasasPct || 0).toString().replace(',', '.'));
+        // parseFloat(x || 0) convierte "no venía" en 0 silenciosamente. Si el
+        // campo no trae un número válido, kcal/pP/cP/gP quedan en NaN y el
+        // guard `!isNaN(...)` de abajo simplemente no toca ese dato — en vez
+        // de forzarlo a cero cada vez que el input llega vacío por accidente.
+        const toNumOrNaN = (v) => {
+            if (v === undefined || v === null || v === '') return NaN;
+            return parseFloat(v.toString().replace(',', '.'));
+        };
+        const kcal = toNumOrNaN(calorias);
+        const pP = toNumOrNaN(proteinasPct);
+        const cP = toNumOrNaN(carbohidratosPct);
+        const gP = toNumOrNaN(grasasPct);
 
+        // nombre/tipoPlan/notasGenerales: el frontend manda solo la llave
+        // "nueva" (nombre/tipoPlan/notasGenerales), nunca el alias legacy en
+        // paralelo. Un `||` entre ambas trata "" (campo vaciado a propósito)
+        // igual que "no vino nada" y cae al alias (casi siempre undefined),
+        // así que Prisma nunca persiste el vaciado. Comprobar undefined en
+        // vez de falsy conserva la intención real de vaciar el campo.
         const dataUpdate = {
-            nombre: nombre || nombrePlan,
-            tipoPlan: tipoPlan || tipo,
-            notasGenerales: notasGenerales || notas,
+            nombre: nombre !== undefined ? nombre : nombrePlan,
+            tipoPlan: tipoPlan !== undefined ? tipoPlan : tipo,
+            notasGenerales: notasGenerales !== undefined ? notasGenerales : notas,
             suplementosDetalle: suplementosDetalle || []
         };
+
+        if (valoracionId !== undefined) {
+            dataUpdate.valoracionId = valoracionId || null;
+        }
 
         // Obtener peso del paciente para calcular gr/kg
         const existingPlan = await prisma.plan.findUnique({ where: { id }, select: { pacienteId: true } });
