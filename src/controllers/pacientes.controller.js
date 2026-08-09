@@ -388,6 +388,21 @@ export const update = async (req, res, next) => {
             data.estatura = parseFloat(talla);
         }
 
+        // El frontend puede mandar estatura directamente (campo "estatura") en
+        // vez de "talla". Si llega vacía, Prisma truena al intentar parsear el
+        // Decimal ("" no es un número válido) — normalizamos a null/float.
+        if ('estatura' in data) {
+            data.estatura = data.estatura === '' || data.estatura == null ? null : parseFloat(data.estatura);
+        }
+
+        // "peso" se destructura arriba para excluirlo de otros usos legacy,
+        // pero eso lo tiraba: nunca se reasignaba a `data`, así que un cambio
+        // de peso en Editar Paciente jamás se guardaba. Paciente.peso sí
+        // existe en el schema, así que lo normalizamos y lo devolvemos a data.
+        if (peso !== undefined) {
+            data.peso = peso === '' || peso == null ? null : parseFloat(peso);
+        }
+
         if (data.fechaNacimiento) {
             data.fechaNacimiento = new Date(data.fechaNacimiento);
         }
