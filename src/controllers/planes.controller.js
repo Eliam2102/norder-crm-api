@@ -510,6 +510,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 },
                 paciente: {
                     select: {
+                        estatura: true,
                         complexion: true,
                         datosEjercicio: {
                             select: {
@@ -563,6 +564,7 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
                     },
                     paciente: {
                         select: {
+                            estatura: true,
                             complexion: true,
                             datosEjercicio: {
                                 select: {
@@ -649,7 +651,9 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
             // Mapping results with appropriate fallbacks
             vObj.pesoActual = toNum(v.pesoActual);
-            vObj.estatura = toNum(v.estatura);
+            // Talla es fija en adultos: si la valoración no trae su propio
+            // registro, se respalda con la estatura guardada en el perfil.
+            vObj.estatura = toNum(v.estatura) ?? toNum(v.paciente?.estatura);
             vObj.imc = toNum(v.imc);
 
             // Fat fallbacks: 4-comp -> 2-comp
