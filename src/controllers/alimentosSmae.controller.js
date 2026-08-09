@@ -2,6 +2,15 @@ import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
 import { normalizeName } from '../lib/normalizeName.js';
 
+// El formulario manda cantidadPorcion como null (no undefined) cuando queda
+// vacío — parseFloat(null) da NaN, que Prisma escribe tal cual en la columna
+// Float y corrompe la fila. Mismo riesgo late en pesoGramos/equivalentesBase.
+const numOrNull = (v) => {
+    if (v === '' || v === undefined || v === null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+};
+
 export const getAll = async (req, res, next) => {
     try {
         const { q, grupo } = req.query;
@@ -34,7 +43,8 @@ export const create = async (req, res, next) => {
             porcionCasera, cantidadPorcion, unidadPorcion, notas, equivalencias
         } = req.body;
 
-        if (!nombre || !grupo || pesoGramos === undefined) {
+        const pesoGramosNum = numOrNull(pesoGramos);
+        if (!nombre || !grupo || pesoGramosNum === null) {
             return error(res, 'Campos requeridos: nombre, grupo, pesoGramos', 400);
         }
 
@@ -51,11 +61,11 @@ export const create = async (req, res, next) => {
             data: {
                 nombre: nombre.trim(),
                 grupo,
-                equivalentesBase: equivalentesBase !== undefined ? parseFloat(equivalentesBase) : 1,
-                pesoGramos: parseFloat(pesoGramos),
+                equivalentesBase: numOrNull(equivalentesBase) ?? 1,
+                pesoGramos: pesoGramosNum,
                 unidadBase: unidadBase?.trim() || 'g',
                 porcionCasera: porcionCasera?.trim() || null,
-                cantidadPorcion: cantidadPorcion !== undefined ? parseFloat(cantidadPorcion) : null,
+                cantidadPorcion: numOrNull(cantidadPorcion),
                 unidadPorcion: unidadPorcion?.trim() || null,
                 notas: notas?.trim() || null,
                 equivalencias: Array.isArray(equivalencias) ? equivalencias : null,
@@ -80,11 +90,17 @@ export const update = async (req, res, next) => {
         const dataToUpdate = {};
         if (nombre !== undefined)            dataToUpdate.nombre           = nombre.trim();
         if (grupo !== undefined)             dataToUpdate.grupo            = grupo;
-        if (equivalentesBase !== undefined)  dataToUpdate.equivalentesBase = parseFloat(equivalentesBase);
-        if (pesoGramos !== undefined)        dataToUpdate.pesoGramos       = parseFloat(pesoGramos);
+        if (equivalentesBase !== undefined)  dataToUpdate.equivalentesBase = numOrNull(equivalentesBase) ?? 1;
+        if (pesoGramos !== undefined) {
+            const pesoGramosNum = numOrNull(pesoGramos);
+            if (pesoGramosNum === null) {
+                return error(res, 'pesoGramos debe ser un número válido', 400);
+            }
+            dataToUpdate.pesoGramos = pesoGramosNum;
+        }
         if (unidadBase !== undefined)      dataToUpdate.unidadBase      = unidadBase?.trim() || 'g';
         if (porcionCasera !== undefined)   dataToUpdate.porcionCasera   = porcionCasera?.trim() || null;
-        if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = parseFloat(cantidadPorcion);
+        if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = numOrNull(cantidadPorcion);
         if (unidadPorcion !== undefined)   dataToUpdate.unidadPorcion   = unidadPorcion?.trim() || null;
         if (notas !== undefined)           dataToUpdate.notas           = notas?.trim() || null;
         if (equivalencias !== undefined)   dataToUpdate.equivalencias   = Array.isArray(equivalencias) ? equivalencias : null;
