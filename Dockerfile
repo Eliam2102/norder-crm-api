@@ -45,7 +45,8 @@ USER node
 
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node prisma ./prisma
-RUN npm ci --omit=dev
+COPY --chown=node:node prisma.config.ts ./
+RUN DATABASE_URL=postgresql://prisma-build:prisma-build@127.0.0.1:5432/prisma-build npm ci --omit=dev
 
 COPY --chown=node:node server.js ./
 COPY --chown=node:node src ./src
