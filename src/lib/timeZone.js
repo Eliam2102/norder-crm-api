@@ -1,4 +1,5 @@
 export const MEXICO_CITY_TIME_ZONE = 'America/Mexico_City';
+export const MERIDA_TIME_ZONE = 'America/Merida';
 
 const partsInTimeZone = (value, timeZone = MEXICO_CITY_TIME_ZONE) => {
     const date = value instanceof Date ? value : new Date(value);
@@ -110,6 +111,12 @@ export const getMexicoCityDateTimeParts = (value) => {
         date: `${parts.year}-${parts.month}-${parts.day}`,
         time: `${parts.hour}:${parts.minute}`
     };
+};
+
+export const getMeridaTime = (value = new Date()) => {
+    const parts = partsInTimeZone(value, MERIDA_TIME_ZONE);
+    if (!parts) return null;
+    return `${parts.hour}:${parts.minute}:${parts.second}`;
 };
 
 export const formatMexicoCityDateTime = (value) => {
