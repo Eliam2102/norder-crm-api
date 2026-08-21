@@ -203,12 +203,15 @@ export const create = async (req, res, next) => {
                     { key: 'colacion2', label: 'Colación' },
                     { key: 'cena',      label: 'Cena' },
                 ];
-                return tiempos.map(({ key, label }) => ({
-                    label,
-                    hora:       c24[key]?.hora       ?? c24[`hora${label.replace(' ','')}`]       ?? '',
-                    ayer:       c24[key]?.ayer       ?? c24[`ayer${label.replace(' ','')}`]       ?? '',
-                    usualmente: c24[key]?.usualmente ?? c24[`usalmente${label.replace(' ','')}`]  ?? '',
-                })).filter(r => r.hora || r.ayer || r.usualmente);
+                return tiempos.map(({ key, label }) => {
+                    const ayer = c24[key]?.ayer ?? c24[`ayer${label.replace(' ','')}`] ?? '';
+                    const usualmente = c24[key]?.usualmente ?? c24[`usalmente${label.replace(' ','')}`] ?? '';
+                    return {
+                        label,
+                        hora: c24[key]?.hora ?? c24[`hora${label.replace(' ','')}`] ?? '',
+                        notas: c24[key]?.notas ?? [ayer, usualmente].filter(Boolean).join(' / '),
+                    };
+                }).filter(r => r.hora || r.notas);
             }
             return [];
         })();
@@ -222,8 +225,7 @@ export const create = async (req, res, next) => {
                     orden: idx,
                     label: r.label || 'Tiempo',
                     hora: r.hora || '',
-                    ayer: r.ayer || '',
-                    usualmente: r.usualmente || '',
+                    notas: r.notas || [r.ayer, r.usualmente].filter(Boolean).join(' / '),
                 }))
             });
             nuevo.habitosAlimentarios = await prisma.habitoAlimentario.findMany({
@@ -302,11 +304,11 @@ export const getById = async (req, res, next) => {
 
         // Default 5 habitos if none exist
         const DEFAULT_HABITOS = [
-            { label: 'Desayuno', hora: '', ayer: '', usualmente: '' },
-            { label: 'Colación', hora: '', ayer: '', usualmente: '' },
-            { label: 'Comida',   hora: '', ayer: '', usualmente: '' },
-            { label: 'Colación', hora: '', ayer: '', usualmente: '' },
-            { label: 'Cena',     hora: '', ayer: '', usualmente: '' },
+            { label: 'Desayuno', hora: '', notas: '' },
+            { label: 'Colación', hora: '', notas: '' },
+            { label: 'Comida',   hora: '', notas: '' },
+            { label: 'Colación', hora: '', notas: '' },
+            { label: 'Cena',     hora: '', notas: '' },
         ];
 
         const mapped = { 
@@ -532,8 +534,7 @@ export const update = async (req, res, next) => {
                         orden: idx,
                         label: r.label || 'Tiempo',
                         hora: r.hora || '',
-                        ayer: r.ayer || '',
-                        usualmente: r.usualmente || '',
+                        notas: r.notas || [r.ayer, r.usualmente].filter(Boolean).join(' / '),
                     }))
                 });
             }
@@ -641,8 +642,7 @@ export const upsertConsumo = async (req, res, next) => {
                     orden: idx,
                     label: r.label || 'Tiempo',
                     hora: r.hora || '',
-                    ayer: r.ayer || '',
-                    usualmente: r.usualmente || '',
+                    notas: r.notas || [r.ayer, r.usualmente].filter(Boolean).join(' / '),
                 }))
             });
             data = await prisma.habitoAlimentario.findMany({
