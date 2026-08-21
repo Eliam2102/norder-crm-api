@@ -220,6 +220,7 @@ model Valoracion {
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
   createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
   deletedAt               DateTime? @map("deleted_at")  // soft delete
 
   paciente        Paciente              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -296,6 +297,7 @@ model Plan {
   revisionId        String?  @map("revision_id")
   valoracionId      String?  @map("valoracion_id")
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   nombre            String?
   tipoPlan          String   @map("tipo_plan")
   calorias          Int
