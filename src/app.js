@@ -24,6 +24,7 @@ import citasRoutes from './routes/citas.routes.js';
 import agentRoutes from './routes/agent.routes.js';
 import webhooksRoutes from './routes/webhooks.routes.js';
 import portalRoutes from './routes/portal.routes.js';
+import { startNotificationWorker } from './jobs/notificationWorker.js';
 
 const app = express();
 
@@ -124,5 +125,8 @@ app.use((req, res) => {
 // Error Handler
 app.use(errorHandler);
 
+// ─── Background Jobs ──────────────────────────────────────────────────────────
+// NotificationWorker: reintenta planes en cola (OutboundMessageQueue) cada 5 min
+startNotificationWorker();
 
 export default app;
