@@ -370,6 +370,8 @@
         .supl-activo { color: #22863a; font-weight: bold; }
         .supl-suspendido { color: #999; font-weight: bold; }
         .supl-row-suspended { opacity: 0.55; text-decoration: line-through; }
+        .supl-table-historial th { background: #e5e5e5; color: #444; }
+        .supl-table-norder th { background: #000; color: #fff; }
         .spelling-preview-error {
             color: #b91c1c !important;
             background: rgba(254, 202, 202, 0.55);
@@ -1283,9 +1285,31 @@
         </div>
     <% } %>
 
-    <div class="section-title">Esquema de suplementación:</div>
+    <% if (plan.historialSuplementos && plan.historialSuplementos.length > 0) { %>
+        <div class="section-title">Historial de suplementación (previo a la consulta):</div>
+        <table class="supl-table supl-table-historial">
+            <thead>
+                <tr>
+                    <th>Suplemento</th>
+                    <th>Indicaciones</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                <% plan.historialSuplementos.forEach(sup => { %>
+                    <tr class="<%= sup.activo ? '' : 'supl-row-suspended' %>">
+                        <td><%= sup.nombre %></td>
+                        <td><%= sup.indicaciones %></td>
+                        <td><span class="<%= sup.activo ? 'supl-activo' : 'supl-suspendido' %>"><%= sup.estado %></span></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
+    <% } %>
+
+    <div class="section-title">NORDER SUPS:</div>
     <% if (plan.suplementosTabla && plan.suplementosTabla.length > 0) { %>
-        <table class="supl-table">
+        <table class="supl-table supl-table-norder">
             <thead>
                 <tr>
                     <th>Suplemento</th>

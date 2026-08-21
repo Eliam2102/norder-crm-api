@@ -11,6 +11,7 @@ import {
 import { collectPlanSpellingIssues } from '../services/spellcheck.service.js';
 import { normalizeDeliveryChannels, normalizeOrchestratorChannelStatus } from '../lib/planDelivery.js';
 import { mexicoCityDateTimeToUtc } from '../lib/timeZone.js';
+import { sendPlanNotification } from '../services/notification.service.js';
 
 export const getMenuPersistenceData = (menuData = {}) => ({
     tipoContenido: menuData.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos',
@@ -448,7 +449,7 @@ export const update = async (req, res, next) => {
     }
 };
 
-const enrichPlanForPdf = async (plan, metaOverride = null) => {
+export const enrichPlanForPdf = async (plan, metaOverride = null) => {
     let valoraciones = [];
     if (plan.pacienteId) {
 
@@ -811,6 +812,21 @@ const enrichPlanForPdf = async (plan, metaOverride = null) => {
     }
     // ─────────────────────────────────────────────────────────────────────────
 
+    // ── Historial de Suplementación: lo que el paciente reportó tomar YA, ──────
+    // distinto de NORDER SUPS (fuenteSupl arriba, lo que el nutriólogo recomendó).
+    plan.historialSuplementos = [];
+    const historialSupl = antecedentes?.suplementosDetalle;
+    if (historialSupl && Array.isArray(historialSupl) && historialSupl.length > 0) {
+        plan.historialSuplementos = historialSupl
+            .filter(s => s.nombre && s.nombre.trim())
+            .map(s => ({
+                nombre: s.nombre,
+                indicaciones: s.indicaciones || '-',
+                activo: s.activo,
+                estado: s.activo ? 'ACTIVO' : 'SUSPENDIDO'
+            }));
+    }
+
 
     plan.temarioReciente = [];
     plan.competenciaReciente = null;
@@ -1033,100 +1049,41 @@ export const sendPlan = async (req, res, next) => {
             return error(res, 'Error interno al generar el PDF del plan. No se pudo enviar.', 500);
         }
 
-        // 5. Enviar correo y WhatsApp mediante N8N Webhook
+        // 5. Enviar por los canales indicados (estrategia 3 capas: N8N → fallback directo → cola)
         const nombreArchivo = `plan-${(planEnriquecido.nombre || 'alimenticio').replace(/ /g, '_')}.pdf`;
-        const webhookUrl = process.env.N8N_WEBHOOK_URL;
-
-        let statusMensajes = 'no-definido';
-        let n8nResponseText = '';
-
-        if (webhookUrl) {
-            try {
-                const formData = new FormData();
-                formData.append('pdfPlan', new Blob([pdfBuffer], { type: 'application/pdf' }), nombreArchivo);
-                formData.append('email', canales.email ? (paciente.email || '') : '');
-
-                let telefonoLimpio = (paciente.telefono || '').replace(/\D/g, '');
-                if (telefonoLimpio && telefonoLimpio.length <= 10) {
-                    telefonoLimpio = '52' + telefonoLimpio;
-                }
-                formData.append('telefono', canales.whatsapp ? telefonoLimpio : '');
-
-                formData.append('paciente_nombre', paciente.nombre || '');
-                formData.append('plan_nombre', planEnriquecido.nombre || '');
-                // Contrato explícito para el workflow de N8N. Los datos del canal
-                // desactivado también viajan vacíos por compatibilidad defensiva.
-                formData.append('enviar_email', String(canales.email));
-                formData.append('enviar_whatsapp', String(canales.whatsapp));
-                formData.append('canales', JSON.stringify(canales));
-
-                console.log(`[sendPlan] Preparando envío a N8N: ${webhookUrl}`);
-                console.log(`[sendPlan] Tamaño del PDF: ${(pdfBuffer.length / 1024 / 1024).toFixed(2)} MB`);
-
-                const fileObj = new File([pdfBuffer], nombreArchivo, { type: 'application/pdf' });
-                formData.set('pdfPlan', fileObj);
-
-                // Axios post
-                const { default: axios } = await import('axios');
-                const response = await axios.post(webhookUrl, formData, {
-                    headers: {
-                        // Axios handles multipart headers automatically when given FormData
-                    },
-                    maxBodyLength: Infinity,
-                    maxContentLength: Infinity
-                });
-
-                statusMensajes = 'ok';
-                console.log('[sendPlan] PDF y Meta-datos emitidos a N8N Webhook con éxito.');
-
-                // Intento parsear la respuesta por si N8N nos da un reporte de Email/WhatsApp individual
-                try {
-                    const jsonRes = response.data;
-                    n8nResponseText = jsonRes;
-                    console.log('[sendPlan] Respuesta N8N detallada:', jsonRes);
-                    if (jsonRes && (
-                        (canales.email && jsonRes.email === 'error')
-                        || (canales.whatsapp && jsonRes.whatsapp === 'error')
-                    )) {
-                        statusMensajes = 'advertencia';
-                    }
-                } catch (e) { }
-
-            } catch (err) {
-                // Determine if it was an HTTP error or network error
-                let errorMsg = err.message;
-                if (err.response) {
-                    errorMsg = `Status ${err.response.status}: ${JSON.stringify(err.response.data).substring(0, 150)}`;
-                } else if (err.request) {
-                    errorMsg = `Sin respuesta del servidor (${err.code})`;
-                }
-
-                console.error(`[sendPlan] Falló ejecución hacia N8N:`, errorMsg);
-                statusMensajes = 'error';
-                return error(res, `Fallo al comunicarse con el orquestador (N8N): ${errorMsg}`, 502);
-            }
-        } else {
-            console.warn('[sendPlan] Falló el envío porque N8N_WEBHOOK_URL no está definido en .env');
-            return error(res, 'El sistema no tiene configurada la URL del orquestador (N8N).', 500);
-        }
-
-        // 6. Marcar como enviado
-        const planActualizado = await prisma.plan.update({
-            where: { id },
-            data: { estadoEnvio: 'enviado', pdfGeneradoAt: new Date() }
+        const notifyResult = await sendPlanNotification({
+            planId: id,
+            pacienteId: paciente.id,
+            paciente,
+            pdfBuffer,
+            nombreArchivo,
+            canales,
+            planNombre: planEnriquecido.nombre,
         });
 
-        return ok(res, {
-            message: 'Plan emitido hacia el orquestador correctamente',
-            orquestador: statusMensajes,
+        console.log(`[sendPlan] Resultado de notificación: via=${notifyResult.via} | email=${notifyResult.email} | wa=${notifyResult.whatsapp}`);
+
+        // 6. Marcar como enviado o pendiente según resultado
+        const planActualizado = await prisma.plan.update({
+            where: { id },
+            data: {
+                estadoEnvio: notifyResult.estadoPlan,
+                pdfGeneradoAt: new Date(),
+            },
+        });
+
+        // Si quedó en cola, responder 202 Accepted (no es un error, es "en proceso")
+        const httpStatus = notifyResult.via === 'cola' ? 202 : 200;
+        return res.status(httpStatus).json({
+            success: true,
+            message: notifyResult.via === 'cola'
+                ? 'El plan se enviará automáticamente cuando el servicio esté disponible (en cola de reintento).'
+                : 'Plan enviado correctamente.',
+            via: notifyResult.via,
             canales,
-            email: canales.email
-                ? normalizeOrchestratorChannelStatus(n8nResponseText, 'email', statusMensajes)
-                : 'omitido',
-            whatsapp: canales.whatsapp
-                ? normalizeOrchestratorChannelStatus(n8nResponseText, 'whatsapp', statusMensajes)
-                : 'omitido',
-            plan: planActualizado
+            email: notifyResult.email,
+            whatsapp: notifyResult.whatsapp,
+            plan: planActualizado,
         });
 
     } catch (err) {

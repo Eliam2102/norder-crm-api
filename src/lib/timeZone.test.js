@@ -2,10 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
     formatMexicoCityDateTime,
+    getMeridaTime,
     getMexicoCityDateTimeParts,
     mexicoCityDateTimeToUtc,
     normalizeBookingStart
 } from './timeZone.js';
+
+test('obtiene la hora de Mérida sin depender de la zona horaria del servidor', () => {
+    assert.equal(getMeridaTime('2026-08-18T18:30:45.000Z'), '12:30:45');
+});
 
 test('convierte las 9:30 de Ciudad de México a las 15:30 UTC', () => {
     const result = mexicoCityDateTimeToUtc('2026-09-14', '09:30');

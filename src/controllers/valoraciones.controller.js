@@ -1,5 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { mapBioimpedancia, optionalNumber } from '../lib/bioimpedancia.js';
+import { getMeridaTime } from '../lib/timeZone.js';
 import { ok } from '../utils/response.js';
 
 // Todas las columnas Decimal/Int de Valoracion que create()/update() dejan
@@ -223,7 +224,7 @@ export const create = async (req, res, next) => {
                 pacienteId,
                 numeroValoracion,
                 fecha: req.body.fecha ? new Date(req.body.fecha) : new Date(),
-                hora: req.body.hora || new Date().toLocaleTimeString('en-US', { hour12: false }),
+                hora: req.body.hora || getMeridaTime(),
                 temarioConsulta: (temario || temarioConsulta) ? {
                     create: (temario || temarioConsulta)
                         .filter(t => t.tema || t.detalle)

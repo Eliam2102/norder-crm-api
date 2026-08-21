@@ -45,6 +45,7 @@ model Paciente {
   resumenMemoria   ResumenPaciente?
   fotosSeguimiento FotoSeguimiento[]
   fotosLogs         FotoSeguimientoLog[]
+  mensajesCola     OutboundMessageQueue[]
 
   @@map("paciente")
 }
@@ -76,6 +77,8 @@ model HabitoAlimentario {
   orden      Int     @default(0)
   label      String  // "Desayuno", "Colación", "Comida", etc.
   hora       String?
+  notas      String?
+  // Deprecados: reemplazados por `notas`. Se conservan sin uso para no perder datos históricos.
   ayer       String?
   usualmente String?
 
@@ -217,6 +220,7 @@ model Valoracion {
   suplementosDetalle      Json?
   evitar                  String?  @map("evitar")
   createdAt               DateTime  @default(now()) @map("created_at")
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
   deletedAt               DateTime? @map("deleted_at")  // soft delete
 
   paciente        Paciente              @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
@@ -293,6 +297,7 @@ model Plan {
   revisionId        String?  @map("revision_id")
   valoracionId      String?  @map("valoracion_id")
   fechaCreacion     DateTime @default(now()) @map("fecha_creacion")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
   nombre            String?
   tipoPlan          String   @map("tipo_plan")
   calorias          Int
@@ -324,10 +329,11 @@ model Plan {
   pdfGeneradoAt  DateTime? @map("pdf_generado_at")
   pdfCustomMeta  Json?     @map("pdf_custom_meta")
 
-  paciente   Paciente?   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
-  revision   Revision?   @relation(fields: [revisionId], references: [id], onDelete: SetNull)
-  valoracion Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
-  menus      PlanMenu[]
+  paciente      Paciente?   @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+  revision      Revision?   @relation(fields: [revisionId], references: [id], onDelete: SetNull)
+  valoracion    Valoracion? @relation(fields: [valoracionId], references: [id], onDelete: SetNull)
+  menus         PlanMenu[]
+  mensajesCola  OutboundMessageQueue[]
 
   @@index([pacienteId])
   @@index([valoracionId])
@@ -672,4 +678,30 @@ model FotoSeguimientoLog {
   @@index([pacienteId, createdAt])
   @@index([valoracionId, createdAt])
   @@map("foto_seguimiento_log")
+}
+
+// ─── Cola de mensajes salientes (fallback de alta disponibilidad) ─────────────
+// Se encola cuando n8n Y el fallback directo fallan.
+// El worker notificationWorker.js procesa esta tabla cada 5 minutos.
+model OutboundMessageQueue {
+  id            String   @id @default(uuid())
+  planId        String   @map("plan_id")
+  pacienteId    String   @map("paciente_id")
+  /// JSON: { "email": true, "whatsapp": true }
+  canales       String
+  intentos      Int      @default(0)
+  /// 2880 = 10 días con reintentos cada 5 min. Cambia a 0 para reintentos infinitos.
+  maxIntentos   Int      @default(2880) @map("max_intentos")
+  /// pendiente | procesando | enviado | error
+  estado        String   @default("pendiente")
+  ultimoError   String?  @map("ultimo_error")
+  creadoEn      DateTime @default(now()) @map("creado_en")
+  actualizadoEn DateTime @updatedAt @map("actualizado_en")
+
+  plan     Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  paciente Paciente @relation(fields: [pacienteId], references: [id], onDelete: Cascade)
+
+  @@index([estado, intentos])
+  @@index([planId])
+  @@map("outbound_message_queue")
 }
