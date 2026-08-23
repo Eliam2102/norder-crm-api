@@ -223,7 +223,7 @@ export const create = async (req, res, next) => {
                     id: randomUUID(),
                     pacienteId: nuevo.id,
                     orden: idx,
-                    label: r.label || 'Tiempo',
+                    label: (r.label || '').trim().toLowerCase() === 'comida' ? 'Almuerzo' : (r.label || 'Tiempo'),
                     hora: r.hora || '',
                     notas: r.notas || [r.ayer, r.usualmente].filter(Boolean).join(' / '),
                 }))
@@ -343,7 +343,10 @@ export const getById = async (req, res, next) => {
             } : {},
             // Return habitos as array (new dynamic format)
             habitos: (ha && ha.length > 0)
-                ? ha.map(({ id: _id, pacienteId: _pid, orden: _o, ...fields }) => fields)
+                ? ha.map(({ id: _id, pacienteId: _pid, orden: _o, ...fields }) => ({
+                    ...fields,
+                    label: (fields.label || '').trim().toLowerCase() === 'comida' ? 'Almuerzo' : (fields.label || 'Tiempo')
+                }))
                 : DEFAULT_HABITOS,
             valoraciones: valoracionesMapped,
             ultimaValoracion: valoracionesMapped[0] || null
@@ -532,7 +535,7 @@ export const update = async (req, res, next) => {
                         id: randomUUID(),
                         pacienteId: id,
                         orden: idx,
-                        label: r.label || 'Tiempo',
+                        label: (r.label || '').trim().toLowerCase() === 'comida' ? 'Almuerzo' : (r.label || 'Tiempo'),
                         hora: r.hora || '',
                         notas: r.notas || [r.ayer, r.usualmente].filter(Boolean).join(' / '),
                     }))
