@@ -199,7 +199,7 @@ export const create = async (req, res, next) => {
                 const tiempos = [
                     { key: 'desayuno',  label: 'Desayuno' },
                     { key: 'colacion1', label: 'Colación' },
-                    { key: 'almuerzo',  label: 'Comida' },
+                    { key: 'almuerzo',  label: 'Almuerzo' },
                     { key: 'colacion2', label: 'Colación' },
                     { key: 'cena',      label: 'Cena' },
                 ];
@@ -306,7 +306,7 @@ export const getById = async (req, res, next) => {
         const DEFAULT_HABITOS = [
             { label: 'Desayuno', hora: '', notas: '' },
             { label: 'Colación', hora: '', notas: '' },
-            { label: 'Comida',   hora: '', notas: '' },
+            { label: 'Almuerzo', hora: '', notas: '' },
             { label: 'Colación', hora: '', notas: '' },
             { label: 'Cena',     hora: '', notas: '' },
         ];
