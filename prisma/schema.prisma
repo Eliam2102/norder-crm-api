@@ -218,6 +218,7 @@ model Valoracion {
   medicionesEstado        Json?    @map("mediciones_estado")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
+  dietetica               Json?     @map("dietetica")
   evitar                  String?  @map("evitar")
   createdAt               DateTime  @default(now()) @map("created_at")
   updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at")
