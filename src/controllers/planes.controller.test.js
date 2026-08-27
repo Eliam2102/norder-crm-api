@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getMenuPersistenceData } from './planes.controller.js';
+import { getMenuPersistenceData, resolveBioEnergiaForPdf } from './planes.controller.js';
 
 test('guarda el barrido seleccionado y el modo de cada menú', () => {
     const selected = {
@@ -24,4 +24,16 @@ test('mantiene platillos como comportamiento predeterminado', () => {
         tipoContenido: 'platillos',
         barridoEquivalencias: null
     });
+});
+
+test('conserva la energía explícita de bioimpedancia sobre el barrido', () => {
+    assert.equal(resolveBioEnergiaForPdf(1425, 1150), 1425);
+});
+
+test('usa las kcal del barrido cuando la energía de la valoración está vacía', () => {
+    assert.equal(resolveBioEnergiaForPdf(null, 1150), 1150);
+});
+
+test('mantiene vacía la energía cuando no existe en valoración ni barrido', () => {
+    assert.equal(resolveBioEnergiaForPdf(null, null), null);
 });

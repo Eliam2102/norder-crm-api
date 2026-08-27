@@ -20,6 +20,16 @@ export const getMenuPersistenceData = (menuData = {}) => ({
         : null
 });
 
+export const resolveBioEnergiaForPdf = (bioEnergia, barridoKcalTotal) => {
+    const toNumber = (value) => {
+        if (value == null || value === '') return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+    };
+
+    return toNumber(bioEnergia) ?? toNumber(barridoKcalTotal);
+};
+
 const findNextCitaForPlan = async (plan) => {
     if (!plan?.pacienteId) return null;
     const futureFilter = { gte: new Date() };
@@ -664,7 +674,10 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
             vObj.bioGrasa = toNum(v.bioGrasa);
             vObj.bioAgua = toNum(v.bioAgua);
             vObj.bioMusculo = toNum(v.bioMusculo);
-            vObj.bioEnergia = toNum(v.bioEnergia);
+            // La energía se calcula en el barrido y este puede guardarse después
+            // de la valoración. Conservamos una captura explícita cuando existe
+            // y usamos el total del barrido como respaldo para el PDF.
+            vObj.bioEnergia = resolveBioEnergiaForPdf(v.bioEnergia, v.barrido?.kcalTotal);
             vObj.metodoComposicion = v.medicionesEstado?.metodoComposicion
                 || ([v.bioGrasa, v.bioAgua, v.bioMusculo, v.bioEnergia].some(value => value != null)
                     ? 'BIOIMPEDANCIA'
