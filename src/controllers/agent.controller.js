@@ -220,7 +220,8 @@ export const getContexto = async (req, res) => {
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
         const tieneNivel = paciente.nivelMembresia && paciente.nivelMembresia !== 'ninguna';
-        const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= hoy;
+        // Sin fecha de fin registrada = sin vencimiento definido, no "vencido en 1970".
+        const tieneVigencia = !paciente.suscripcionFin || new Date(paciente.suscripcionFin) >= hoy;
 
         // Tier gratuito — sin membresía de pago activa nunca
         if (!tieneNivel) {

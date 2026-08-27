@@ -177,7 +177,8 @@ export const getContextoPaciente = async ({ telefono, email, pacienteId }) => {
 
     const inicioDiaHoy = hoyMexicoCity();
     const tieneNivel = paciente.nivelMembresia && paciente.nivelMembresia !== 'ninguna';
-    const tieneVigencia = paciente.suscripcionFin && new Date(paciente.suscripcionFin) >= inicioDiaHoy;
+    // Sin fecha de fin registrada = sin vencimiento definido, no "vencido en 1970".
+    const tieneVigencia = !paciente.suscripcionFin || new Date(paciente.suscripcionFin) >= inicioDiaHoy;
 
     // Tier gratuito: sin plan de pago nunca activado
     if (!tieneNivel) {

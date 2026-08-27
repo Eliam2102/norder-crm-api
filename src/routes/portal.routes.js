@@ -6,6 +6,7 @@ import {
     getPlan,
     getMensajes,
     chat,
+    getChatHealthStatus,
     crearCheckout,
     getLatestCheckoutStatus,
     getCheckoutStatus,
@@ -43,6 +44,7 @@ router.get('/mensajes', portalAuthMiddleware, getMensajes);
 router.get('/fotos', portalAuthMiddleware, getFotos);
 router.get('/fotos/:fotoId/archivo', portalAuthMiddleware, getFotoArchivo);
 router.post('/chat', portalAuthMiddleware, chatLimiter, chat);
+router.get('/chat/health', portalAuthMiddleware, getChatHealthStatus);
 router.post('/checkout', portalAuthMiddleware, crearCheckout);
 router.get('/checkout/latest', portalAuthMiddleware, getLatestCheckoutStatus);
 router.get('/checkout/session/:sessionId', portalAuthMiddleware, getCheckoutStatus);
