@@ -2,7 +2,12 @@ import bcrypt from 'bcryptjs';
 import prisma from './src/lib/prisma.js';
 
 const run = async () => {
-    const passwordHash = await bcrypt.hash('Norder2026!', 12);
+    const localAdminPassword = process.env.LOCAL_ADMIN_PASSWORD;
+    if (!localAdminPassword || localAdminPassword.length < 10) {
+        throw new Error('Define LOCAL_ADMIN_PASSWORD con al menos 10 caracteres antes de ejecutar el seed local.');
+    }
+
+    const passwordHash = await bcrypt.hash(localAdminPassword, 12);
     const admin = await prisma.user.upsert({
         where: { email: 'eyder@norder.mx' },
         update: {},
@@ -14,7 +19,7 @@ const run = async () => {
             activo: true,
         },
     });
-    console.log('Admin CRM:', admin.email, '/ Norder2026!');
+    console.log('Admin CRM local creado:', admin.email);
 
     const unAnio = new Date();
     unAnio.setFullYear(unAnio.getFullYear() + 1);
