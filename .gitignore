@@ -8,3 +8,6 @@ dist
 norder-ccrm.code-workspace
 
 backups/
+
+# Infra local de desarrollo (Postgres vía OrbStack/Docker, no compartida con el equipo)
+docker-compose.local.yml

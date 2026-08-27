@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { randomUUID } from 'node:crypto';
 import prisma from '../lib/prisma.js';
 import { normalizarTelefono, getContextoPaciente, hoyMexicoCity } from '../lib/pacienteContext.js';
+import { recordChatOutcome, getChatHealth } from '../lib/chatHealth.js';
 import {
     buildCheckoutReturnUrls,
     buildCheckoutIdempotencyKey,
@@ -356,14 +357,24 @@ export const chat = async (req, res) => {
             chatExtra = { preguntasRestantes: Math.max(0, LIMITE - preguntasHoy), limiteGratis: LIMITE };
         }
 
+        recordChatOutcome(true);
         return res.json({ respuesta, ...chatExtra });
     } catch (err) {
+        recordChatOutcome(false);
         if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
             return res.status(504).json({ error: 'El agente tardó demasiado en responder. Intenta de nuevo.' });
         }
         console.error('[Portal] chat error:', err);
         return res.status(500).json({ error: 'Error al comunicarse con el agente.' });
     }
+};
+
+// ─── Chat health ──────────────────────────────────────────────────────────────
+// Señal aproximada para el frontend: distingue "el webhook de n8n está degradado"
+// de "esta llamada falló". No persiste entre reinicios del proceso.
+
+export const getChatHealthStatus = async (req, res) => {
+    return res.json(getChatHealth());
 };
 
 // ─── Checkout Stripe ──────────────────────────────────────────────────────────
