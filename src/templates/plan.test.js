@@ -35,6 +35,76 @@ const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion)
     });
 };
 
+const renderMenus = (menus) => {
+    const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
+    const plan = {
+        paciente,
+        menus,
+        evitarReciente: [],
+        lineamientosRecientes: [],
+        notasGenerales: '',
+        notasClinicasRecientes: '',
+        notasLibresRecientes: '',
+        temarioReciente: [],
+        pdfCustomMeta: {
+            showPageHistorial: false,
+            showPageMenus: true,
+            showPageIntercambio: false,
+            showPageExtras: false,
+            showAlimentosEvitar: false,
+        },
+    };
+
+    return ejs.renderFile(path.resolve('src/templates/plan.ejs'), {
+        plan,
+        paciente,
+        config: {},
+        valoraciones: [],
+        tiposCuerpoImg: null,
+        logoMenuImg: null,
+    });
+};
+
+test('centra un único menú con contenido y no dibuja una segunda columna vacía', async () => {
+    const html = await renderMenus([
+        {
+            nombre: 'Menú 1',
+            tipoContenido: 'platillos',
+            tiemposComida: [{
+                nombre: 'Desayuno',
+                ingredientes: [{ descripcion: 'Huevos', cantidad: 2, unidad: 'PZA', equivalencias: [] }],
+            }],
+        },
+        {
+            nombre: 'Menú 2',
+            tipoContenido: 'platillos',
+            tiemposComida: [{ nombre: 'Desayuno', ingredientes: [] }],
+        },
+    ]);
+
+    assert.match(html, /class="menu-grid single-menu"/);
+    assert.match(html, />MENÚ<\/div>/);
+    assert.match(html, /Huevos/);
+    assert.doesNotMatch(html, /MENÚ #2/);
+});
+
+test('mantiene las dos columnas cuando ambos menús tienen contenido', async () => {
+    const html = await renderMenus([
+        {
+            nombre: 'Menú 1',
+            tiemposComida: [{ nombre: 'Desayuno', ingredientes: [{ descripcion: 'Huevos' }] }],
+        },
+        {
+            nombre: 'Menú 2',
+            tiemposComida: [{ nombre: 'Desayuno', ingredientes: [{ descripcion: 'Avena' }] }],
+        },
+    ]);
+
+    assert.match(html, />MENÚ #1<\/div>/);
+    assert.match(html, />MENÚ #2<\/div>/);
+    assert.doesNotMatch(html, /class="menu-grid single-menu"/);
+});
+
 test('muestra una sola fotografía destacada de la última consulta en línea', async () => {
     const html = await renderHistory([{
         id: 'valoracion-1',

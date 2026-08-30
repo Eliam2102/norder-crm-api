@@ -407,9 +407,22 @@
         return names[base] ? names[base] + suffix : original;
     };
     
-    // Setup menus map to split into Menu 1 and Menu 2 if they exist
-    const menu1 = plan.menus && plan.menus[0] ? plan.menus[0] : null;
-    const menu2 = plan.menus && plan.menus[1] ? plan.menus[1] : null;
+    // El PDF sólo muestra menús que realmente tienen contenido. Un plan puede
+    // configurarse oficialmente con un solo menú; en ese caso se usa todo el
+    // ancho disponible y no se dibuja una segunda columna vacía.
+    const menuHasContent = (menu) => !!(menu && Array.isArray(menu.tiemposComida) && menu.tiemposComida.some(tiempo =>
+        (Array.isArray(tiempo.ingredientes) && tiempo.ingredientes.length > 0)
+        || String(tiempo.notaPie || '').trim()
+        || String(tiempo.bebida || '').trim()
+        || String(tiempo.suplTiempo || '').trim()
+        || String(tiempo.suplNotas || '').trim()
+    ));
+    const configuredMenus = Array.isArray(plan.menus) ? plan.menus : [];
+    const contentMenus = configuredMenus.filter(menuHasContent);
+    const visibleMenus = contentMenus.length > 0 ? contentMenus.slice(0, 2) : configuredMenus.slice(0, 1);
+    const menu1 = visibleMenus[0] || null;
+    const menu2 = visibleMenus[1] || null;
+    const singleMenu = !!menu1 && !menu2;
 
     // Get all distinct time SLOTS from menus to draw rows based on base meal name.
     // Un mismo nombre base (p.ej. "Colación") puede repetirse varias veces al día
@@ -800,6 +813,9 @@
     if (_peakWeight > 10) _fS *= 0.9;
     if (_peakWeight > 14) _fS *= 0.9;
     _fS = Math.max(_fS, 0.45);
+    // Con una sola columna hay más ancho disponible: aumenta ligeramente la
+    // lectura sin alterar la escala defensiva para planes con muchos tiempos.
+    const _singleMenuBoost = singleMenu ? 1.15 : 1;
     const _pad  = _nT > 5 ? '3px 4px' : '5px 6px';
     const _mbI  = _nT > 6 ? '1px' : '2px';
     const _mtN  = _nT > 5 ? '2px' : '4px';
@@ -808,19 +824,19 @@
     <%- headerHTML %>
     <!-- Bloque de estilos dinámicos: sobreescribe los base según densidad de contenido -->
     <style>
-        .menu-time  { font-size: <%- (10   * _fS).toFixed(1) %>px !important; margin-bottom: <%- _nT>6?'1px':'3px' %>; }
-        .menu-item  { font-size: <%- (8.5  * _fS).toFixed(1) %>px !important; line-height: 1.25; margin-bottom: <%- _mbI %>; padding-left: 8px; }
-        .menu-sub   { font-size: <%- (7.2  * _fS).toFixed(1) %>px !important; line-height: 1.2; }
-        .menu-water,.menu-bebida,.menu-supl { font-size: <%- (8.5 * _fS).toFixed(1) %>px !important; margin-top: <%- _mtN %>; }
+        .menu-time  { font-size: <%- (10   * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-bottom: <%- _nT>6?'1px':'3px' %>; }
+        .menu-item  { font-size: <%- (8.5  * _fS * _singleMenuBoost).toFixed(1) %>px !important; line-height: 1.25; margin-bottom: <%- _mbI %>; padding-left: 8px; }
+        .menu-sub   { font-size: <%- (7.2  * _fS * _singleMenuBoost).toFixed(1) %>px !important; line-height: 1.2; }
+        .menu-water,.menu-bebida,.menu-supl { font-size: <%- (8.5 * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-top: <%- _mtN %>; }
         .menu-col   { padding: <%- _pad %> !important; }
         /* Nombres de platillo (inline bold) */
-        .menu-col div[style*="font-weight:bold"] { font-size: <%- (8.5 * _fS).toFixed(1) %>px !important; margin-top: 3px; margin-bottom: 1px; }
+        .menu-col div[style*="font-weight:bold"] { font-size: <%- (8.5 * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-top: 3px; margin-bottom: 1px; }
     </style>
     <div class="menu-page-body">
-    <div class="menu-grid">
+    <div class="menu-grid<%= singleMenu ? ' single-menu' : '' %>">
         <div class="menu-row fixed-row">
-            <div class="menu-col text-center font-bold">MENÚ #1</div>
-            <div class="menu-col text-center font-bold">MENÚ #2</div>
+            <div class="menu-col text-center font-bold"><%= singleMenu ? 'MENÚ' : 'MENÚ #1' %></div>
+            <% if (menu2) { %><div class="menu-col text-center font-bold">MENÚ #2</div><% } %>
         </div>
         
         <%
@@ -902,6 +918,7 @@
                 <% } %>
             </div>
             
+            <% if (menu2) { %>
             <!-- Menú 2 -->
             <div class="menu-col">
                 <div class="menu-time">
@@ -976,6 +993,7 @@
                     <div class="menu-supl"><%= tMenu2.suplTiempo %><% if(tMenu2.suplNotas) { %> — <span style="font-size:8px;"><%= tMenu2.suplNotas %></span><% } %></div>
                 <% } %>
             </div>
+            <% } %>
         </div>
         <% }); %>
 
