@@ -223,3 +223,47 @@ test('conserva somatotipo y energía del plan en antropometría', async () => {
     assert.match(html, /Mesomorfo/);
     assert.doesNotMatch(html, /Resultados de Bioimpedancia/);
 });
+
+test('habilita paginación dinámica únicamente en historial y extras', async () => {
+    const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
+    const plan = {
+        paciente,
+        menus: [{
+            nombre: 'Menú 1',
+            tiemposComida: [{
+                nombre: 'Desayuno',
+                ingredientes: [{ descripcion: 'Huevos', cantidad: 2, unidad: 'PZA' }],
+            }],
+        }],
+        evitarReciente: [],
+        lineamientosRecientes: [],
+        notasGenerales: '',
+        notasClinicasRecientes: '',
+        notasLibresRecientes: '',
+        temarioReciente: [],
+        pdfCustomMeta: {
+            showPageHistorial: true,
+            showPageMenus: true,
+            showPageIntercambio: true,
+            showPageExtras: true,
+            showAlimentosEvitar: false,
+        },
+    };
+
+    const html = await ejs.renderFile(path.resolve('src/templates/plan.ejs'), {
+        plan,
+        paciente,
+        config: {},
+        valoraciones: [],
+        tiposCuerpoImg: null,
+        logoMenuImg: null,
+    });
+
+    assert.match(html, /data-pdf-flow-page="history"/);
+    assert.match(html, /data-pdf-flow-root="history"/);
+    assert.match(html, /data-pdf-flow-page="extras"/);
+    assert.match(html, /data-pdf-flow-root="extras"/);
+    assert.match(html, /window\.__NORDER_PAGINATE_PDF__/);
+    assert.doesNotMatch(html, /data-pdf-flow-page="menus"/);
+    assert.doesNotMatch(html, /data-pdf-flow-page="intercambio"/);
+});

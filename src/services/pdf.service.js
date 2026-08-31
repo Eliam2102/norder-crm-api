@@ -43,6 +43,20 @@ const launchBrowser = async () => {
     });
 };
 
+const preparePdfPage = async (page, html) => {
+    await page.setContent(html, { waitUntil: 'networkidle0' });
+    const pagination = await page.evaluate(async () => {
+        if (typeof window.__NORDER_PAGINATE_PDF__ !== 'function') {
+            return { generatedPages: 0, overflow: [{ kind: 'document', type: 'missing-paginator' }] };
+        }
+        return window.__NORDER_PAGINATE_PDF__();
+    });
+    if (pagination.overflow.length > 0) {
+        throw new Error(`El PDF excede el espacio imprimible: ${JSON.stringify(pagination.overflow)}`);
+    }
+    return pagination;
+};
+
 /**
  * Genera el PDF y lo guarda en /tmp. Devuelve la ruta del archivo.
  * Usado por el endpoint GET /planes/:id/pdf (streaming al browser).
@@ -56,15 +70,17 @@ export const generarPlanPDF = async (plan, valoraciones = []) => {
     const html = await renderHTML(plan, paciente, config, valoraciones);
 
     const browser = await launchBrowser();
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
+    try {
+        const page = await browser.newPage();
+        await preparePdfPage(page, html);
 
-    const uniqueId = Math.random().toString(36).substring(7);
-    const filePath = path.join("/tmp", `plan-${id}-${uniqueId}.pdf`);
-    await page.pdf({ path: filePath, format: "A4", landscape: true });
-
-    await browser.close();
-    return filePath;
+        const uniqueId = Math.random().toString(36).substring(7);
+        const filePath = path.join("/tmp", `plan-${id}-${uniqueId}.pdf`);
+        await page.pdf({ path: filePath, format: "A4", landscape: true });
+        return filePath;
+    } finally {
+        await browser.close();
+    }
 };
 
 /**
@@ -81,11 +97,11 @@ export const generarPlanPDFBuffer = async (plan, paciente, valoraciones = []) =>
     const html = await renderHTML(plan, paciente, config, valoraciones);
 
     const browser = await launchBrowser();
-    const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: 'networkidle0' });
-
-    const pdfBuffer = await page.pdf({ format: "A4", landscape: true });
-
-    await browser.close();
-    return pdfBuffer;
+    try {
+        const page = await browser.newPage();
+        await preparePdfPage(page, html);
+        return await page.pdf({ format: "A4", landscape: true });
+    } finally {
+        await browser.close();
+    }
 };

@@ -73,6 +73,24 @@
         }
         .extras-page tr { break-inside: avoid; page-break-inside: avoid; }
         .extras-page .section-title { break-after: avoid; page-break-after: avoid; }
+        .pdf-generated-continuation {
+            height: 209mm;
+            min-height: 209mm;
+            break-before: page;
+            page-break-before: always;
+            break-inside: avoid;
+            page-break-inside: avoid;
+            break-after: page;
+            page-break-after: always;
+        }
+        .pdf-generated-continuation .header { margin-bottom: 12px; }
+        .pdf-continuation-heading {
+            margin-bottom: 10px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .pdf-flow-root { min-height: 0; }
+        .pdf-flow-unit { width: 100%; }
 
         /* HEADER */
         .header {
@@ -518,7 +536,7 @@
 
 <!-- PAGE 1: HISTORIAL -->
 <% if (showHistorial) { %>
-<div class="page <%= plan.consultaEnLinea ? 'online-followup-page' : '' %>">
+<div class="page <%= plan.consultaEnLinea ? 'online-followup-page' : '' %>" data-pdf-flow-page="history">
     <%- headerHTML %>
     <% if (plan.consultaEnLinea) { %>
         <div class="online-followup-heading">
@@ -647,6 +665,7 @@
                 </div>
             <% } %>
 
+            <div class="pdf-flow-root" data-pdf-flow-root="history">
             <% 
                const lArray = (plan.lineamientosRecientes && plan.lineamientosRecientes.length > 0)
                    ? plan.lineamientosRecientes
@@ -654,15 +673,18 @@
                
                if (lArray.length > 0) {
             %>
+                <div class="pdf-flow-unit" data-pdf-flow-list>
                 <div class="font-bold" style="margin-bottom: 4px;">Lineamientos:</div>
                 <ul class="bullet-list" style="list-style-type: none;">
                     <% lArray.forEach(item => { %>
                         <li>- &nbsp;&nbsp;<%= item %></li>
                     <% }); %>
                 </ul>
+                </div>
             <% } %>
 
             <!-- Observaciones / Notas Generales -->
+            <div class="pdf-flow-unit" data-pdf-flow-list>
             <div class="font-bold" style="margin-bottom: 4px;">Notas en consulta:</div>
             <ul class="bullet-list" style="list-style-type: none;">
                 <%
@@ -681,30 +703,38 @@
                     <li>- &nbsp;&nbsp;Ninguna</li>
                 <% } %>
             </ul>
+            </div>
 
             <% if (plan.notasLibresRecientes && plan.notasLibresRecientes.trim() !== "") { %>
+                <div class="pdf-flow-unit" data-pdf-flow-list>
                 <div class="font-bold" style="margin-bottom: 4px;">Notas de entrenamiento:</div>
                 <ul class="bullet-list" style="list-style-type: none;">
                     <% plan.notasLibresRecientes.split(/\r?\n/).filter(n => n.trim() !== '').forEach(item => { %>
                         <li>- &nbsp;&nbsp;<%= item.trim() %></li>
                     <% }); %>
                 </ul>
+                </div>
             <% } %>
 
             <% if (plan.temarioReciente && plan.temarioReciente.length > 0) { %>
+                <div class="pdf-flow-unit" data-pdf-flow-list>
                 <div class="font-bold" style="margin-bottom: 4px;">Temario abordado:</div>
                 <ul class="bullet-list" style="list-style-type: none;">
                     <% plan.temarioReciente.forEach(tem => { %>
                         <li>- &nbsp;&nbsp;<strong><%= tem.tema %>:</strong> <%= tem.detalle %></li>
                     <% }); %>
                 </ul>
+                </div>
             <% } %>
 
             <% if (meta.notaAmarilla && meta.notaAmarilla.trim() !== "") { %>
+                <div class="pdf-flow-unit">
                 <div style="text-align:center; margin: 20px 0;"><span class="highlight-yellow"><%= meta.notaAmarilla %></span></div>
+                </div>
             <% } %>
 
 <% if (meta.showContacto === true) { %>
+            <div class="pdf-flow-unit">
             <table style="width:100%; border-collapse: collapse; margin-bottom: 6px;">
                 <tr>
                     <td style="width:50%; padding: 2px 8px; border-right: none; vertical-align: middle;">
@@ -720,6 +750,7 @@
                     </td>
                 </tr>
             </table>
+            </div>
 <% } %>
 
 <% if (meta.showAlimentosEvitar !== false) { %>
@@ -728,6 +759,7 @@
                 const evitarTexto = evitarPrimeraHoja.join(' · ');
                 const evitarFontSize = evitarTexto.length > 700 ? 6.5 : evitarTexto.length > 350 ? 7.25 : 8.5;
             %>
+            <div class="pdf-flow-unit">
             <div class="avoid-foods-summary" style="font-size: <%= evitarFontSize %>px;">
                 <span class="avoid-foods-summary__title">Alimentos a evitar / No consume / No le gustan:</span>
                 <% if (evitarPrimeraHoja.length > 0) { %>
@@ -736,7 +768,9 @@
                     <span class="avoid-foods-summary__empty">Sin información registrada.</span>
                 <% } %>
             </div>
+            </div>
 <% } %>
+            </div>
         </div>
 
         <!-- Columna derecha: Guía Tipos de Cuerpo HTML nativo -->
@@ -1216,10 +1250,12 @@
 
 <!-- PAGE 4: EXTRAS -->
 <% if (showExtras) { %>
-<div class="page extras-page">
+<div class="page extras-page" data-pdf-flow-page="extras">
     <%- headerHTML %>
+    <div class="pdf-flow-root" data-pdf-flow-root="extras">
     
     <% if (meta.showDistribucionPorciones !== false && plan.menus && plan.menus.length > 0) { %>
+        <div class="pdf-flow-unit">
         <div class="section-title">Distribución de porciones en el día</div>
         <div class="extras-distribution-grid" style="display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap;">
             <% plan.menus.forEach(menu => { %>
@@ -1301,9 +1337,11 @@
                 </div>
             <% }); %>
         </div>
+        </div>
     <% } %>
 
     <% if (plan.historialSuplementos && plan.historialSuplementos.length > 0) { %>
+        <div class="pdf-flow-unit" data-pdf-flow-table>
         <div class="section-title">Historial de suplementación (previo a la consulta):</div>
         <table class="supl-table supl-table-historial">
             <thead>
@@ -1323,8 +1361,10 @@
                 <% }); %>
             </tbody>
         </table>
+        </div>
     <% } %>
 
+    <div class="pdf-flow-unit" data-pdf-flow-table>
     <div class="section-title">NORDER SUPS:</div>
     <% if (plan.suplementosTabla && plan.suplementosTabla.length > 0) { %>
         <table class="supl-table supl-table-norder">
@@ -1354,7 +1394,9 @@
             <% }); %>
         </table>
     <% } %>
+    </div>
 
+    <div class="pdf-flow-unit" data-pdf-flow-table>
     <div class="section-title">Esquema de hidratación:</div>
     <table class="data-table">
         <% if (plan.esqueHidratacionReciente) { %>
@@ -1363,8 +1405,10 @@
             <tr><td style="color: #888; font-style: italic;">Sin indicaciones específicas.</td></tr>
         <% } %>
     </table>
+    </div>
 
     <% if (meta.estrategiaMaraton && meta.estrategiaMaraton.mostrar !== false) { %>
+        <div class="pdf-flow-unit" data-pdf-flow-table>
         <div class="section-title"><span class="highlight-yellow"><%= meta.estrategiaMaraton.titulo || 'Estrategia para 1/2 maraton' %></span></div>
         <table>
             <% (meta.estrategiaMaraton.filas || [["35 min", "1er gel"], ["1:10 hr", "2do gel"], ["1:45 hr hr", "3er gel + cafeina"]]).forEach(fila => { %>
@@ -1374,18 +1418,152 @@
                 </tr>
             <% }); %>
         </table>
+        </div>
     <% } %>
 
     <% if (plan.competenciaReciente) { %>
+        <div class="pdf-flow-unit" data-pdf-flow-table>
         <div class="section-title">Notas de competencia:</div>
         <table style="width: 450px;">
             <% (['antes', 'durante', 'despues']).forEach(fase => { if (plan.competenciaReciente[fase]) { %>
                 <tr><td style="width: 90px;"><strong><%= fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después' %>:</strong></td><td><%= plan.competenciaReciente[fase] %></td></tr>
             <% } }); %>
         </table>
+        </div>
     <% } %>
+    </div>
 </div>
 <% } %>
+
+<script>
+    window.__NORDER_PAGINATE_PDF__ = async () => {
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+
+        const generatedPages = [];
+        const overflow = [];
+
+        const pageFits = (page) => {
+            const root = page.querySelector('[data-pdf-flow-root]');
+            const last = root && root.lastElementChild;
+            if (!last) return true;
+            const pageRect = page.getBoundingClientRect();
+            const paddingBottom = Number.parseFloat(getComputedStyle(page).paddingBottom || '0');
+            return last.getBoundingClientRect().bottom <= pageRect.bottom - paddingBottom + 0.5;
+        };
+
+        const createContinuation = (source, kind, afterPage) => {
+            const page = document.createElement('div');
+            page.className = kind === 'extras'
+                ? 'page extras-page pdf-generated-continuation'
+                : 'page pdf-generated-continuation';
+            page.dataset.pdfFlowContinuation = kind;
+
+            const header = source.querySelector(':scope > .header');
+            if (header) page.append(header.cloneNode(true));
+
+            const heading = document.createElement('div');
+            heading.className = 'pdf-continuation-heading';
+            if (kind === 'history') {
+                const patientTitle = source.querySelector('.title-name');
+                heading.textContent = patientTitle
+                    ? `${patientTitle.textContent.trim()} - seguimiento (continuación)`
+                    : 'Seguimiento clínico (continuación)';
+            } else {
+                heading.textContent = 'Información adicional (continuación)';
+            }
+            page.append(heading);
+
+            const root = document.createElement('div');
+            root.className = 'pdf-flow-root';
+            root.dataset.pdfFlowRoot = kind;
+            page.append(root);
+            afterPage.insertAdjacentElement('afterend', page);
+            generatedPages.push(page);
+            return { page, root };
+        };
+
+        const paginateSource = (source) => {
+            const kind = source.dataset.pdfFlowPage;
+            const sourceRoot = source.querySelector(`[data-pdf-flow-root="${kind}"]`);
+            if (!sourceRoot) return;
+
+            const units = Array.from(sourceRoot.children);
+            units.forEach(unit => unit.remove());
+            let current = { page: source, root: sourceRoot };
+            let lastPage = source;
+
+            const nextPage = () => {
+                current = createContinuation(source, kind, lastPage);
+                lastPage = current.page;
+                return current;
+            };
+
+            const appendAtomic = (unit) => {
+                current.root.append(unit);
+                if (pageFits(current.page)) return;
+                unit.remove();
+                nextPage();
+                current.root.append(unit);
+                if (!pageFits(current.page)) {
+                    overflow.push({ kind, type: 'atomic', text: unit.textContent.trim().slice(0, 120) });
+                }
+            };
+
+            const appendSplittable = (unit, rowSelector) => {
+                const rowContainer = unit.querySelector(rowSelector);
+                if (!rowContainer) {
+                    appendAtomic(unit);
+                    return;
+                }
+                const rows = Array.from(rowContainer.children);
+                rows.forEach(row => row.remove());
+
+                const makeSegment = (continuation) => {
+                    const segment = unit.cloneNode(true);
+                    const target = segment.querySelector(rowSelector);
+                    target.replaceChildren();
+                    if (continuation) {
+                        const title = segment.querySelector('.font-bold, .section-title');
+                        if (title && !/continuación/i.test(title.textContent)) title.textContent += ' (continuación)';
+                    }
+                    current.root.append(segment);
+                    if (!pageFits(current.page)) {
+                        segment.remove();
+                        nextPage();
+                        current.root.append(segment);
+                    }
+                    return { segment, target };
+                };
+
+                let segmentState = makeSegment(false);
+                rows.forEach((row) => {
+                    segmentState.target.append(row);
+                    if (pageFits(current.page)) return;
+
+                    row.remove();
+                    if (segmentState.target.children.length === 0) {
+                        segmentState.segment.remove();
+                    }
+                    nextPage();
+                    segmentState = makeSegment(true);
+                    segmentState.target.append(row);
+                    if (!pageFits(current.page)) {
+                        overflow.push({ kind, type: rowSelector, text: row.textContent.trim().slice(0, 120) });
+                    }
+                });
+            };
+
+            units.forEach((unit) => {
+                if (unit.hasAttribute('data-pdf-flow-list')) appendSplittable(unit, 'ul');
+                else if (unit.hasAttribute('data-pdf-flow-table')) appendSplittable(unit, 'tbody');
+                else appendAtomic(unit);
+            });
+        };
+
+        document.querySelectorAll('[data-pdf-flow-page]').forEach(paginateSource);
+        return { generatedPages: generatedPages.length, overflow };
+    };
+</script>
 
 <% if (Array.isArray(plan.spellingPreviewIssues) && plan.spellingPreviewIssues.length > 0) { %>
 <script>
