@@ -257,7 +257,7 @@ export const getById = async (req, res, next) => {
                     ], 
                     include: { 
                         temarioConsulta: true, 
-                        barrido: { select: { id: true, kcalTotal: true, porciones: true } },
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true, tiempos: true } },
                         planes: { take: 1, orderBy: { fechaCreacion: 'desc' } } 
                     } 
                 },
@@ -272,6 +272,20 @@ export const getById = async (req, res, next) => {
         const valoracionesMapped = val.map(v => {
             const { planes, barrido, ...vRest } = v;
             const planAsociado = planes[0] || null;
+            let barridoTiempos = [];
+            if (barrido?.tiempos) {
+                try {
+                    const parsed = typeof barrido.tiempos === 'string'
+                        ? JSON.parse(barrido.tiempos)
+                        : barrido.tiempos;
+                    if (Array.isArray(parsed)) barridoTiempos = parsed;
+                } catch (e) {
+                    // Un barrido histórico malformado no debe impedir abrir el expediente.
+                }
+            }
+            const barridoMapped = barrido
+                ? { ...barrido, tiempos: barridoTiempos }
+                : null;
             
             // Detección real de barrido
             let hasBarrido = false;
@@ -296,7 +310,7 @@ export const getById = async (req, res, next) => {
             return { 
                 ...vRest, 
                 plan: planAsociado,
-                barrido,
+                barrido: barridoMapped,
                 hasBarrido,
                 estadoFlujo
             };
