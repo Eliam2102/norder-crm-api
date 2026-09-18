@@ -30,6 +30,16 @@ export const resolveBioEnergiaForPdf = (bioEnergia, barridoKcalTotal) => {
     return toNumber(bioEnergia) ?? toNumber(barridoKcalTotal);
 };
 
+export const resolveMasaMagraForPdf = (masaMagra, kgMasaMagra2comp) => {
+    const toNumber = (value) => {
+        if (value == null || value === '') return null;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : null;
+    };
+
+    return toNumber(masaMagra) ?? toNumber(kgMasaMagra2comp);
+};
+
 const findNextCitaForPlan = async (plan) => {
     if (!plan?.pacienteId) return null;
     const futureFilter = { gte: new Date() };
@@ -496,6 +506,7 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
                 pctGrasaCorp: true,
                 pctGrasa2comp: true,
                 masaMagra: true,
+                kgMasaMagra2comp: true,
                 masaGrasaReal: true,
                 kgGrasa2comp: true,
                 bioGrasa: true,
@@ -550,6 +561,7 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
                     pctGrasaCorp: true,
                     pctGrasa2comp: true,
                     masaMagra: true,
+                    kgMasaMagra2comp: true,
                     masaGrasaReal: true,
                     kgGrasa2comp: true,
                     bioGrasa: true,
@@ -670,7 +682,7 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
             // Fat fallbacks: 4-comp -> 2-comp
             vObj.pctGrasaCorp = toNum(v.pctGrasaCorp) ?? toNum(v.pctGrasa2comp);
             vObj.masaGrasaReal = toNum(v.masaGrasaReal) ?? toNum(v.kgGrasa2comp);
-            vObj.masaMagra = toNum(v.masaMagra);
+            vObj.masaMagra = resolveMasaMagraForPdf(v.masaMagra, v.kgMasaMagra2comp);
             vObj.bioGrasa = toNum(v.bioGrasa);
             vObj.bioAgua = toNum(v.bioAgua);
             vObj.bioMusculo = toNum(v.bioMusculo);
