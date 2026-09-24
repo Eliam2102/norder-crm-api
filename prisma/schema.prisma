@@ -27,6 +27,7 @@ model Paciente {
   suscripcionFin       DateTime? @map("suscripcion_fin") @db.Date
   ultimaCheckoutId     String?   @map("ultima_checkout_id")
   portalActivo         Boolean   @default(false) @map("portal_activo")
+  mostrarBioimpedancia Boolean   @default(true) @map("mostrar_bioimpedancia")
 
   @@index([nivelMembresia])
   @@index([fechaRegistro])
@@ -59,6 +60,8 @@ model DatosEjercicio {
   horaEntrenamiento    String? @map("hora_entrenamiento")
   frecuencia           String?
   tiempo               String?
+  activo                Boolean @default(true)
+  disciplinasDetalle   Json?   @map("disciplinas_detalle")
   detallesAdicionales  String? @map("detalles_adicionales")
   nivelActividad       String? @map("nivel_actividad")
   porcentajeSedentario Int     @default(10) @map("porcentaje_sedentario")
@@ -161,6 +164,8 @@ model Valoracion {
   colesterol              Decimal? @map("colesterol") @db.Decimal(12, 4)
   creatinina              Decimal? @map("creatinina") @db.Decimal(12, 4)
   acidoUrico              Decimal? @map("acido_urico") @db.Decimal(12, 4)
+  otrosBioquimicos        String?  @map("otros_bioquimicos")
+  bioquimicosOtrosDetalle Json?    @map("bioquimicos_otros_detalle")
   // Signos vitales
   frecuenciaCardiaca      Int?     @map("frecuencia_cardiaca") // opcional/no payload
   presionArterial         String?  @map("presion_arterial") // opcional/no payload
@@ -218,6 +223,7 @@ model Valoracion {
   medicionesEstado        Json?    @map("mediciones_estado")
   suplementacion          String?  @map("suplementacion")
   suplementosDetalle      Json?
+  dinamicaDeportiva       Json?    @map("dinamica_deportiva")
   dietetica               Json?     @map("dietetica")
   evitar                  String?  @map("evitar")
   createdAt               DateTime  @default(now()) @map("created_at")

@@ -12,6 +12,7 @@ import { collectPlanSpellingIssues } from '../services/spellcheck.service.js';
 import { normalizeDeliveryChannels, normalizeOrchestratorChannelStatus } from '../lib/planDelivery.js';
 import { mexicoCityDateTimeToUtc } from '../lib/timeZone.js';
 import { sendPlanNotification } from '../services/notification.service.js';
+import { buildBioquimicaTable, buildDinamicaDeportivaTable } from '../lib/planClinicalTables.js';
 
 export const getMenuPersistenceData = (menuData = {}) => ({
     tipoContenido: menuData.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos',
@@ -745,6 +746,24 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
 
     let antecedentes = null;
     let ultimaVal = valoraciones.length > 0 ? valoraciones[0] : null;
+    const valoracionClinicaId = plan.valoracionId || ultimaVal?.id;
+    const valoracionClinica = valoracionClinicaId
+        ? await prisma.valoracion.findUnique({
+            where: { id: valoracionClinicaId },
+            select: {
+                glucosa: true,
+                trigliceridos: true,
+                colesterol: true,
+                creatinina: true,
+                acidoUrico: true,
+                otrosBioquimicos: true,
+                bioquimicosOtrosDetalle: true,
+                dinamicaDeportiva: true,
+            }
+        })
+        : null;
+    plan.bioquimicaTabla = buildBioquimicaTable(valoracionClinica);
+    plan.dinamicaDeportivaTabla = buildDinamicaDeportivaTable(valoracionClinica);
 
     if (plan.pacienteId) {
         antecedentes = await prisma.antecedentes.findUnique({

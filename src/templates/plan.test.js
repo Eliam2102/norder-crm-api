@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import ejs from 'ejs';
 
-const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion) => {
-    const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
+const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion, mostrarBioimpedancia = true) => {
+    const paciente = { nombre: 'Paciente', apellido: 'Prueba', mostrarBioimpedancia };
     const plan = {
         paciente,
         consultaEnLinea,
@@ -64,6 +64,47 @@ const renderMenus = (menus) => {
         logoMenuImg: null,
     });
 };
+
+const renderClinicalExtras = (bioquimicaTabla, dinamicaDeportivaTabla) => {
+    const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
+    const plan = {
+        paciente,
+        menus: [],
+        bioquimicaTabla,
+        dinamicaDeportivaTabla,
+        suplementosTabla: [],
+        suplementacionReciente: [],
+        evitarReciente: [],
+        lineamientosRecientes: [],
+        notasGenerales: '',
+        notasClinicasRecientes: '',
+        notasLibresRecientes: '',
+        temarioReciente: [],
+        pdfCustomMeta: {
+            showPageHistorial: false,
+            showPageMenus: false,
+            showPageIntercambio: false,
+            showPageExtras: true,
+            showAlimentosEvitar: false,
+        },
+    };
+    return ejs.renderFile(path.resolve('src/templates/plan.ejs'), {
+        plan, paciente, config: {}, valoraciones: [], tiposCuerpoImg: null, logoMenuImg: null,
+    });
+};
+
+test('muestra bioquímica y pausas deportivas en tablas del PDF', async () => {
+    const html = await renderClinicalExtras(
+        [{ nombre: 'Vitamina D', valor: '35 ng/mL' }],
+        { activo: true, rows: [{ disciplina: 'Pesas', frecuencia: '3 días', duracion: '60 min', activo: false }] },
+    );
+    assert.match(html, /Bioquímica · Resultados de laboratorio/);
+    assert.match(html, /Vitamina D/);
+    assert.match(html, /35 ng\/mL/);
+    assert.match(html, /Dinámica deportiva · Estado general: ACTIVO/);
+    assert.match(html, /Pesas/);
+    assert.match(html, /PAUSADA/);
+});
 
 test('centra un único menú con contenido y no dibuja una segunda columna vacía', async () => {
     const html = await renderMenus([
@@ -204,6 +245,18 @@ test('incluye las cuatro filas de bioimpedancia sólo cuando existen resultados'
     assert.doesNotMatch(html, /Somatotipo/);
     assert.doesNotMatch(html, /Energía\(kcal\)/);
     assert.doesNotMatch(html, /Mesomorfo/);
+});
+
+test('oculta bioimpedancia en el PDF cuando el expediente la tiene desactivada', async () => {
+    const html = await renderHistory([{
+        id: 'valoracion-1',
+        fecha: new Date('2026-07-27T12:00:00Z'),
+        bioGrasa: 24.3,
+        bioAgua: 52.1,
+    }], false, 'BIOIMPEDANCIA', false);
+
+    assert.doesNotMatch(html, /Resultados de Bioimpedancia/);
+    assert.match(html, /Resultados Antropométricos/);
 });
 
 test('conserva somatotipo y energía del plan en antropometría', async () => {

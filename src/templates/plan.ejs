@@ -583,7 +583,7 @@
                         <td class="font-bold">Talla (cm)</td>
                         <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
                     </tr>
-                    <% if (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia)) { %>
+                    <% if (paciente.mostrarBioimpedancia !== false && (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia))) { %>
                         <tr><td colspan="8" class="font-bold text-center">Resultados de Bioimpedancia</td></tr>
                         <tr>
                             <td class="font-bold">Grasa (%)</td>
@@ -1337,6 +1337,39 @@
                 </div>
             <% }); %>
         </div>
+        </div>
+    <% } %>
+
+    <% if (plan.bioquimicaTabla && plan.bioquimicaTabla.length > 0) { %>
+        <div class="pdf-flow-unit" data-pdf-flow-table>
+        <div class="section-title">Bioquímica · Resultados de laboratorio:</div>
+        <table class="supl-table">
+            <thead><tr><th>Estudio</th><th>Resultado</th></tr></thead>
+            <tbody>
+                <% plan.bioquimicaTabla.forEach(item => { %>
+                    <tr><td><%= item.nombre %></td><td><%= item.valor %></td></tr>
+                <% }); %>
+            </tbody>
+        </table>
+        </div>
+    <% } %>
+
+    <% if (plan.dinamicaDeportivaTabla && plan.dinamicaDeportivaTabla.rows.length > 0) { %>
+        <div class="pdf-flow-unit" data-pdf-flow-table>
+        <div class="section-title">Dinámica deportiva · Estado general: <%= plan.dinamicaDeportivaTabla.activo ? 'ACTIVO' : 'PAUSADO' %></div>
+        <table class="supl-table">
+            <thead><tr><th>Disciplina</th><th>Frecuencia</th><th>Duración</th><th>Estado</th></tr></thead>
+            <tbody>
+                <% plan.dinamicaDeportivaTabla.rows.forEach(item => { %>
+                    <tr class="<%= item.activo ? '' : 'supl-row-suspended' %>">
+                        <td><%= item.disciplina %></td>
+                        <td><%= item.frecuencia %></td>
+                        <td><%= item.duracion %></td>
+                        <td><span class="<%= item.activo ? 'supl-activo' : 'supl-suspendido' %>"><%= item.activo ? 'ACTIVA' : 'PAUSADA' %></span></td>
+                    </tr>
+                <% }); %>
+            </tbody>
+        </table>
         </div>
     <% } %>
 
