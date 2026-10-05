@@ -27,6 +27,19 @@ test('SERV con equivalentesBase=3: 1 SERV = 3 EQ, ancla = 0.33 SERV/EQ', () => {
     assert.equal(ingrediente.cantidad, 1); // 3 eq * (1/3) SERV/eq = 1 SERV, no 3
 });
 
+test('SERV conserva centésimas al resolver una equivalencia de tres por porción', () => {
+    const alimento = {
+        id: 'serv-3', nombre: 'Servicio', grupo: 'aoaMuyBajo',
+        pesoGramos: 1, equivalentesBase: 3, unidadBase: 'serv', unidadPorcion: 'SERV',
+    };
+    const { byId, byNombre } = buildCatalog([alimento]);
+    const { ingrediente } = resolveIngredienteContraSmae(
+        { alimentoSmaeId: 'serv-3', descripcion: 'Servicio', unidad: 'SERV', cantidad: 1, eqCantidad: 1 },
+        byId, byNombre,
+    );
+    assert.equal(ingrediente.cantidad, 0.33);
+});
+
 test('GR con equivalentesBase=1 (mayoría del catálogo): comportamiento sin cambios', () => {
     const alimento = {
         id: 'pollo-1', nombre: 'Pechuga de pollo', grupo: 'aoaMuyBajo',
@@ -125,3 +138,16 @@ test('equivalencias extra (multi-grupo) no se recalculan, solo se preserva su va
     assert.equal(ingrediente.equivalencias[1].cantidad, 0.5);
     assert.equal(ingrediente.equivalencias[1].grupo, 'Grasa s/prot');
 });
+
+for (const unit of ['g', 'GR', 'gramos']) {
+    test(`Queso Oaxaca: 2 EQ se resuelven a 60 g cuando la unidad guardada es ${unit}`, () => {
+        const alimento = { id: 'queso-oaxaca', nombre: 'Queso Oaxaca', grupo: 'aoaModerado', pesoGramos: 30, equivalentesBase: 1, unidadBase: 'g' };
+        const { byId, byNombre } = buildCatalog([alimento]);
+        const original = { alimentoSmaeId: alimento.id, descripcion: alimento.nombre, cantidad: 120, unidad: unit, eqCantidad: 2 };
+        const { ingrediente } = resolveIngredienteContraSmae(original, byId, byNombre);
+        assert.equal(ingrediente.cantidad, 60);
+        assert.equal(ingrediente.unidad, 'GR');
+        assert.equal(original.cantidad, 120);
+        assert.equal(alimento.pesoGramos, 30);
+    });
+}

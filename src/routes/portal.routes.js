@@ -15,6 +15,7 @@ import {
 import { portalAuthMiddleware } from '../middlewares/portalAuth.middleware.js';
 import { authMiddleware } from '../middlewares/auth.middleware.js';
 import { listPortal as getFotos, filePortal as getFotoArchivo } from '../controllers/fotosSeguimiento.controller.js';
+import { noStoreLogin } from '../middlewares/loginProtection.js';
 
 const router = Router();
 
@@ -37,7 +38,7 @@ const loginLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-router.post('/login', loginLimiter, loginPortal);
+router.post('/login', noStoreLogin, loginLimiter, loginPortal);
 router.get('/me', portalAuthMiddleware, getMe);
 router.get('/plan', portalAuthMiddleware, getPlan);
 router.get('/mensajes', portalAuthMiddleware, getMensajes);

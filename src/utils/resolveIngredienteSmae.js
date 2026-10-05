@@ -27,8 +27,9 @@ export const normalizarNombre = (str) =>
 // 'GR' es el c\u00f3digo hist\u00f3rico para "unidad ancla en gramos" (la mayor\u00eda del cat\u00e1logo). Alimentos con
 // otra unidad base (ml, pz, serv...) usan ese c\u00f3digo en may\u00fasculas como su propio ancla.
 const unidadBaseToCode = (base) => {
-    const b = String(base || 'g').trim().toLowerCase();
-    return b === 'g' ? 'GR' : b.toUpperCase();
+    const value = String(base || 'g').trim().toUpperCase();
+    const aliases = { G: 'GR', GR: 'GR', GRAMO: 'GR', GRAMOS: 'GR', ML: 'ML', MILILITRO: 'ML', MILILITROS: 'ML', PZ: 'PIEZA', PZA: 'PIEZA', PZAS: 'PIEZA', PIEZA: 'PIEZA', PIEZAS: 'PIEZA', TZ: 'TAZA', TAZA: 'TAZA', TAZAS: 'TAZA' };
+    return aliases[value] || value;
 };
 
 // Función pura y síncrona: no hace queries. byId/byNombre se construyen una sola vez
@@ -65,7 +66,7 @@ export const resolveIngredienteContraSmae = (ing, byId, byNombre) => {
     // (mismo criterio que SmaeIngredientePicker.tsx:160-186).
     const anchorUnit = unidadBaseToCode(match.unidadBase);
     const storedEq = Number(ing.eqCantidad) || 0;
-    const originalUpper = String(ing.unidad || anchorUnit).toUpperCase();
+    const originalUpper = unidadBaseToCode(ing.unidad || anchorUnit);
 
     // Corrección de etiqueta legacy: antes de este fix, la unidad ancla siempre se
     // guardaba como 'GR' aunque el alimento tuviera otra unidad base (ej. 'ml'). Si el
@@ -73,7 +74,7 @@ export const resolveIngredienteContraSmae = (ing, byId, byNombre) => {
     // (es decir, 'GR' no puede ser una porción casera legítima), es un residuo del bug:
     // se relabela a la unidad ancla real del catálogo.
     const staleGR = originalUpper === 'GR' && anchorUnit !== 'GR' &&
-        String(match.unidadPorcion || '').toUpperCase() !== 'GR';
+        unidadBaseToCode(match.unidadPorcion || '') !== 'GR';
 
     let cantidad = ing.cantidad;
     let unidad = ing.unidad; // por defecto, preservar tal cual (respeta mayúsc/minúsc originales)
@@ -82,7 +83,7 @@ export const resolveIngredienteContraSmae = (ing, byId, byNombre) => {
         unidad = anchorUnit;
     }
     if (storedEq > 0 && nuevoAncla > 0 && (staleGR || originalUpper === anchorUnit)) {
-        cantidad = parseFloat((storedEq * nuevoAncla).toFixed(1));
+        cantidad = parseFloat((storedEq * nuevoAncla).toFixed(2));
         unidad = anchorUnit;
     }
 

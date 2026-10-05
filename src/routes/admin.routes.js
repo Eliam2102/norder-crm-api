@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import * as admin from '../controllers/admin.controller.js';
 import { authMiddleware, requireAdmin } from '../middlewares/auth.middleware.js';
+import { loginLimiter, noStoreLogin } from '../middlewares/loginProtection.js';
 
 const router = Router();
 
 // ─── Login unificado (admin + practicante) ───────────────────────────────────
-router.post('/login', admin.loginUsuario);
+router.post('/login', noStoreLogin, loginLimiter, admin.loginUsuario);
 
 // ─── Perfil propio (cualquier usuario autenticado) ──────────────────────────
 router.get('/me',              authMiddleware, admin.miPerfil);

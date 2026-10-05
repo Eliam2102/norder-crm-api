@@ -44,8 +44,12 @@ export const create = async (req, res, next) => {
         } = req.body;
 
         const pesoGramosNum = numOrNull(pesoGramos);
-        if (!nombre || !grupo || pesoGramosNum === null) {
-            return error(res, 'Campos requeridos: nombre, grupo, pesoGramos', 400);
+        const equivalentesBaseNum = equivalentesBase === undefined ? 1 : numOrNull(equivalentesBase);
+        if (!nombre || !grupo || (unidadBase !== undefined && !unidadBase?.trim()) || !(pesoGramosNum > 0) || !(equivalentesBaseNum > 0)) {
+            return error(res, 'Nombre, grupo, cantidad, unidad y equivalentes deben ser válidos y mayores que cero', 400);
+        }
+        if (numOrNull(cantidadPorcion) > 0 && !unidadPorcion?.trim()) {
+            return error(res, 'La porción casera necesita una unidad', 400);
         }
 
         // Anti-duplicado robusto: ignora acentos/mayúsculas/espacios extra, no solo
@@ -61,7 +65,7 @@ export const create = async (req, res, next) => {
             data: {
                 nombre: nombre.trim(),
                 grupo,
-                equivalentesBase: numOrNull(equivalentesBase) ?? 1,
+                equivalentesBase: equivalentesBaseNum,
                 pesoGramos: pesoGramosNum,
                 unidadBase: unidadBase?.trim() || 'g',
                 porcionCasera: porcionCasera?.trim() || null,
@@ -90,15 +94,25 @@ export const update = async (req, res, next) => {
         const dataToUpdate = {};
         if (nombre !== undefined)            dataToUpdate.nombre           = nombre.trim();
         if (grupo !== undefined)             dataToUpdate.grupo            = grupo;
-        if (equivalentesBase !== undefined)  dataToUpdate.equivalentesBase = numOrNull(equivalentesBase) ?? 1;
+        if (equivalentesBase !== undefined) {
+            const value = numOrNull(equivalentesBase);
+            if (!(value > 0)) return error(res, 'equivalentesBase debe ser mayor que cero', 400);
+            dataToUpdate.equivalentesBase = value;
+        }
         if (pesoGramos !== undefined) {
             const pesoGramosNum = numOrNull(pesoGramos);
-            if (pesoGramosNum === null) {
-                return error(res, 'pesoGramos debe ser un número válido', 400);
+            if (!(pesoGramosNum > 0)) {
+                return error(res, 'pesoGramos debe ser mayor que cero', 400);
             }
             dataToUpdate.pesoGramos = pesoGramosNum;
         }
-        if (unidadBase !== undefined)      dataToUpdate.unidadBase      = unidadBase?.trim() || 'g';
+        if (unidadBase !== undefined) {
+            if (!unidadBase?.trim()) return error(res, 'unidadBase es requerida', 400);
+            dataToUpdate.unidadBase = unidadBase.trim();
+        }
+        if (cantidadPorcion !== undefined && numOrNull(cantidadPorcion) > 0 && unidadPorcion !== undefined && !unidadPorcion?.trim()) {
+            return error(res, 'La porción casera necesita una unidad', 400);
+        }
         if (porcionCasera !== undefined)   dataToUpdate.porcionCasera   = porcionCasera?.trim() || null;
         if (cantidadPorcion !== undefined) dataToUpdate.cantidadPorcion = numOrNull(cantidadPorcion);
         if (unidadPorcion !== undefined)   dataToUpdate.unidadPorcion   = unidadPorcion?.trim() || null;
