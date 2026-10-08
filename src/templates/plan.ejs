@@ -35,13 +35,16 @@
             padding: 10mm 16mm;
             page-break-inside: avoid;
         }
+        .extras-page .pdf-flow-root { font-size: 13.5px; line-height: 1.4; }
+        .extras-page .pdf-flow-root th,
+        .extras-page .pdf-flow-root td { font-size: 13.5px; line-height: 1.3; }
         .extras-page .header { margin-bottom: 10px; }
         .extras-page .header-logo img { width: 112px; }
         .extras-page .header-info { font-size: 7px; line-height: 1.25; }
         .extras-page .header-info strong { font-size: 8px; }
         .extras-page .section-title {
-            font-size: 9px;
-            margin-top: 7px !important;
+            font-size: 16px;
+            margin-top: 10px !important;
             margin-bottom: 4px !important;
         }
         .extras-page table { margin-bottom: 7px; }
@@ -54,22 +57,22 @@
             margin-bottom: 0 !important;
         }
         .extras-page .extras-distribution-title {
-            font-size: 10px !important;
-            padding: 3px 0 !important;
+            font-size: 13.5px !important;
+            padding: 5px 0 !important;
         }
         .extras-page .extras-distribution-table { margin-bottom: 0 !important; }
         .extras-page .extras-distribution-table th,
         .extras-page .extras-distribution-table td {
-            padding: 1.5px 6px !important;
-            font-size: 7.5px !important;
-            line-height: 1.05 !important;
+            padding: 3px 6px !important;
+            font-size: 13.5px !important;
+            line-height: 1.3 !important;
         }
         .extras-page .supl-table { margin-bottom: 7px; }
         .extras-page .supl-table th,
         .extras-page .supl-table td {
-            padding: 2px 6px;
-            font-size: 8px;
-            line-height: 1.1;
+            padding: 4px 6px;
+            font-size: 13.5px;
+            line-height: 1.3;
         }
         .extras-page tr { break-inside: avoid; page-break-inside: avoid; }
         .extras-page .section-title { break-after: avoid; page-break-after: avoid; }
@@ -89,7 +92,8 @@
             font-size: 12px;
             font-weight: 800;
         }
-        .pdf-flow-root { min-height: 0; }
+        .pdf-flow-root { min-height: 0; font-size: 13.5px; line-height: 1.4; }
+        .pdf-flow-root .avoid-foods-summary { font-size: 13.5px !important; }
         .pdf-flow-unit { width: 100%; }
 
         /* HEADER */
@@ -330,58 +334,30 @@
             margin-top: 0;
         }
 
-        /* ── MENU GRID — Layout auto-escalable ────────────────────────────── */
-        /* .menu-page convierte la página en columna flex para que el grid
-           se expanda y llene exactamente el espacio disponible */
-        .menu-page {
-            display: flex;
-            flex-direction: column;
-        }
-        /* Wrapper que ocupa todo el espacio bajo el header */
-        .menu-page-body {
-            flex: 1;
-            min-height: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        /* El grid en sí es también una columna flex */
-        .menu-grid {
-            border: 1px solid #000;
-            width: 100%;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-        /* Cada fila de contenido se reparte el espacio equitativamente */
-        .menu-row {
-            display: flex;
-            border-bottom: 1px solid #000;
-            flex: 1;
-            min-height: 0;
-            overflow: hidden;
-        }
-        /* Filas fijas (cabecera y footer) NO se expanden */
-        .menu-row.fixed-row {
-            flex: 0 0 auto;
-        }
+        /* El menú conserva el tamaño de letra y continúa en más páginas. */
+        .menu-page { display: flex; flex-direction: column; }
+        .menu-page-body { min-height: 0; }
+        .menu-grid { border: 1px solid #000; width: 100%; }
+        .menu-row { display: flex; border-bottom: 1px solid #000; }
         .menu-row:last-child { border-bottom: none; }
         .menu-col {
             flex: 1;
+            min-width: 0;
             border-right: 1px solid #000;
-            padding: 5px 6px;
-            overflow: hidden;
-            min-height: 0;
+            padding: 6px 8px;
+            font-size: 13.5px;
+            line-height: 1.3;
+            overflow-wrap: anywhere;
         }
         .menu-col:last-child { border-right: none; }
-        /* Tamaños base — serán sobreescritos por el bloque dinámico en página 2 */
-        .menu-time { font-weight: bold; margin-bottom: 3px; font-size: 10px; }
-        .menu-time-subtitle { font-weight: normal; text-transform: none; font-size: 8px; display: block; margin-top: 1px; }
-        .menu-item { margin-bottom: 2px; padding-left: 10px; font-size: 8.5px; line-height: 1.3; }
-        .menu-sub  { display: block; padding-left: 14px; font-size: 7.5px; color: #555; line-height: 1.25; }
-        .menu-water { margin-top: 5px; font-size: 9px; }
-        .menu-bebida { margin-top: 3px; font-size: 9px; color: #000; }
-        .menu-supl { margin-top: 2px; font-size: 9px; color: #000; }
+        .menu-time { font-weight: bold; margin-bottom: 4px; font-size: 16px; }
+        .menu-time-subtitle { display: block; font-weight: normal; font-size: 13.5px; }
+        .menu-item { margin-bottom: 3px; padding-left: 8px; font-size: 13.5px; }
+        .menu-sub { display: block; padding-left: 14px; font-size: 13.5px; color: #333; }
+        .menu-water, .menu-bebida, .menu-supl { margin-top: 4px; font-size: 13.5px; }
+        .menu-col span { font-size: inherit !important; }
+        .menu-dish { font-size: 13.5px; font-weight: bold; margin: 4px 0 2px; text-transform: uppercase; }
+        .menu-row.fixed-row > div { font-size: 13.5px !important; }
         .supl-table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px; }
         .supl-table th, .supl-table td { border: 1px solid #000; padding: 4px 8px; text-align: left; }
         .supl-table th { background: #f0f0f0; font-weight: 700; }
@@ -792,91 +768,26 @@
 <!-- PAGE 2: MENUS -->
 <% if (showMenus) { %>
 <%
-    // Cuenta cuántas "líneas" de contenido ocupará un tiempo de comida (título +
-    // nombres de platillo + ingredientes/equivalencias + nota/bebida/suplemento),
-    // para poder repartir el alto de cada fila proporcionalmente en vez de parejo.
-    const countTiempoLines = (tMenu, soloEq) => {
-        let lines = 1; // título del tiempo de comida
-        if (!tMenu || !tMenu.ingredientes || tMenu.ingredientes.length === 0) return lines;
-        const grouped = {};
-        tMenu.ingredientes.forEach(ing => {
-            const plat = ing.platillo || '';
-            if (!grouped[plat]) grouped[plat] = [];
-            grouped[plat].push(ing);
-        });
-        if (soloEq) {
-            const summary = aggregatePdfMealEquivalences(Object.values(grouped).flat());
-            lines += summary.lines.length + summary.freeIngredients.length;
-        } else {
-            Object.keys(grouped).forEach(plat => {
-                if (plat) lines += 1; // encabezado del platillo
-                lines += grouped[plat].length;
-            });
-        }
-        if (tMenu.notaPie) lines += 1;
-        if (tMenu.bebida) lines += 1;
-        if (tMenu.suplTiempo) lines += 1;
-        return lines;
-    };
-
-    // Resuelve cada fila una sola vez (tiempo + ambos menús + peso proporcional)
-    const menuRows = timeNames.map(tRow => {
-        const tMenu1 = menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null;
-        const tMenu2 = menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null;
-        const soloEq1 = !!(menu1 && (meta.soloEquivalencias || menu1.tipoContenido === 'equivalencias'));
-        const soloEq2 = !!(menu2 && (meta.soloEquivalencias || menu2.tipoContenido === 'equivalencias'));
-        // Mínimo 2 para que los tiempos con poco contenido no queden ilegibles.
-        const weight = Math.max(countTiempoLines(tMenu1, soloEq1), countTiempoLines(tMenu2, soloEq2), 2);
-        return { tRow, tMenu1, tMenu2, soloEq1, soloEq2, weight };
-    });
-
-    // ── Escalado dinámico: ajusta fuentes y padding según cuántos tiempos de comida
-    // haya Y qué tan cargada esté la fila más densa, para reducir el riesgo de que
-    // esa fila no quepa en el espacio que le toca aunque ya reciba más proporción.
-    const _nT = timeNames.length;
-    const _peakWeight = menuRows.reduce((max, r) => Math.max(max, r.weight), 2);
-    // Factor de escala base según número de tiempos de comida: 1.0 para ≤4, baja hasta 0.58 para 9+
-    let _fS = _nT <= 3 ? 1.0
-            : _nT === 4 ? 0.95
-            : _nT === 5 ? 0.87
-            : _nT === 6 ? 0.79
-            : _nT === 7 ? 0.71
-            : _nT === 8 ? 0.64
-            : 0.58;
-    // Ajuste adicional si la fila más cargada tiene muchas líneas relativas al resto
-    if (_peakWeight > 10) _fS *= 0.9;
-    if (_peakWeight > 14) _fS *= 0.9;
-    _fS = Math.max(_fS, 0.45);
-    // Con una sola columna hay más ancho disponible: aumenta ligeramente la
-    // lectura sin alterar la escala defensiva para planes con muchos tiempos.
-    const _singleMenuBoost = singleMenu ? 1.15 : 1;
-    const _pad  = _nT > 5 ? '3px 4px' : '5px 6px';
-    const _mbI  = _nT > 6 ? '1px' : '2px';
-    const _mtN  = _nT > 5 ? '2px' : '4px';
+    const menuRows = timeNames.map(tRow => ({
+        tRow,
+        tMenu1: menu1 ? findTiempoByOccurrence(menu1.tiemposComida, tRow.name, tRow.occ) : null,
+        tMenu2: menu2 ? findTiempoByOccurrence(menu2.tiemposComida, tRow.name, tRow.occ) : null,
+    }));
 %>
-<div class="page menu-page">
+<div class="page menu-page" data-pdf-flow-page="menus">
     <%- headerHTML %>
-    <!-- Bloque de estilos dinámicos: sobreescribe los base según densidad de contenido -->
-    <style>
-        .menu-time  { font-size: <%- (10   * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-bottom: <%- _nT>6?'1px':'3px' %>; }
-        .menu-item  { font-size: <%- (8.5  * _fS * _singleMenuBoost).toFixed(1) %>px !important; line-height: 1.25; margin-bottom: <%- _mbI %>; padding-left: 8px; }
-        .menu-sub   { font-size: <%- (7.2  * _fS * _singleMenuBoost).toFixed(1) %>px !important; line-height: 1.2; }
-        .menu-water,.menu-bebida,.menu-supl { font-size: <%- (8.5 * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-top: <%- _mtN %>; }
-        .menu-col   { padding: <%- _pad %> !important; }
-        /* Nombres de platillo (inline bold) */
-        .menu-col div[style*="font-weight:bold"] { font-size: <%- (8.5 * _fS * _singleMenuBoost).toFixed(1) %>px !important; margin-top: 3px; margin-bottom: 1px; }
-    </style>
+    <div class="pdf-continuation-heading pdf-menu-patient proper-name">Plan de <%= paciente.nombre %> <%= paciente.apellido || '' %></div>
     <div class="menu-page-body">
-    <div class="menu-grid<%= singleMenu ? ' single-menu' : '' %>">
+    <div class="menu-grid<%= singleMenu ? ' single-menu' : '' %>" data-pdf-flow-root="menus">
         <div class="menu-row fixed-row">
             <div class="menu-col text-center font-bold"><%= singleMenu ? 'MENÚ' : 'MENÚ #1' %></div>
             <% if (menu2) { %><div class="menu-col text-center font-bold">MENÚ #2</div><% } %>
         </div>
         
         <%
-        menuRows.forEach(({ tRow, tMenu1, tMenu2, weight }) => {
+        menuRows.forEach(({ tRow, tMenu1, tMenu2 }) => {
         %>
-        <div class="menu-row" style="flex: <%- weight %> 1 0;">
+        <div class="menu-row">
             <!-- Menú 1 -->
             <div class="menu-col">
                 <div class="menu-time">
@@ -915,7 +826,7 @@
                     <% } else {
                         Object.keys(grouped1).forEach(plat => {
                             if (plat) { %>
-                                <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                                <div class="menu-dish"><%= plat %></div>
                             <% }
                             grouped1[plat].forEach(ing => {
                             %>
@@ -991,7 +902,7 @@
                     <% } else {
                         Object.keys(grouped2).forEach(plat => {
                             if (plat) { %>
-                                <div style="font-size:9px; font-weight:bold; margin-top:5px; margin-bottom:2px; color:#444; text-transform:uppercase;"><%= plat %></div>
+                                <div class="menu-dish"><%= plat %></div>
                             <% }
                             grouped2[plat].forEach(ing => {
                             %>
@@ -1260,7 +1171,7 @@
         <div class="extras-distribution-grid" style="display: flex; gap: 20px; margin-bottom: 25px; flex-wrap: wrap;">
             <% plan.menus.forEach(menu => { %>
                 <div class="extras-distribution-card" style="border: 1px solid #000; width: calc(50% - 10px); box-sizing: border-box; margin-bottom: 10px;">
-                    <div class="extras-distribution-title" style="text-align: center; font-weight: 800; font-size: 14px; padding: 6px 0; border-bottom: 1px solid #000;">
+                    <div class="extras-distribution-title" style="text-align: center; font-weight: 800; font-size: 13.5px; padding: 6px 0; border-bottom: 1px solid #000;">
                         <%= menu.nombre %>
                     </div>
                     <table class="extras-distribution-table" style="width: 100%; border-collapse: collapse; font-size: 11px;">
@@ -1488,7 +1399,9 @@
             const page = document.createElement('div');
             page.className = kind === 'extras'
                 ? 'page extras-page pdf-generated-continuation'
-                : 'page pdf-generated-continuation';
+                : kind === 'menus'
+                    ? 'page menu-page pdf-generated-continuation'
+                    : 'page pdf-generated-continuation';
             page.dataset.pdfFlowContinuation = kind;
 
             const header = source.querySelector(':scope > .header');
@@ -1501,22 +1414,97 @@
                 heading.textContent = patientTitle
                     ? `${patientTitle.textContent.trim()} - seguimiento (continuación)`
                     : 'Seguimiento clínico (continuación)';
+            } else if (kind === 'menus') {
+                heading.textContent = `${source.querySelector('.pdf-menu-patient').textContent.trim()} - menú (continuación)`;
             } else {
                 heading.textContent = 'Información adicional (continuación)';
             }
             page.append(heading);
 
             const root = document.createElement('div');
-            root.className = 'pdf-flow-root';
+            root.className = kind === 'menus' ? source.querySelector('.menu-grid').className : 'pdf-flow-root';
             root.dataset.pdfFlowRoot = kind;
+            if (kind === 'menus') root.append(source.querySelector('.menu-row.fixed-row').cloneNode(true));
             page.append(root);
             afterPage.insertAdjacentElement('afterend', page);
             generatedPages.push(page);
             return { page, root };
         };
 
+        const paginateMenus = (source) => {
+            const sourceRoot = source.querySelector('[data-pdf-flow-root="menus"]');
+            const rows = Array.from(sourceRoot.children).slice(1);
+            rows.forEach(row => row.remove());
+            let current = { page: source, root: sourceRoot };
+            let lastPage = source;
+            const nextPage = () => {
+                current = createContinuation(source, 'menus', lastPage);
+                lastPage = current.page;
+            };
+
+            rows.forEach(row => {
+                current.root.append(row);
+                if (pageFits(current.page)) return;
+                row.remove();
+                // Intentar primero el tiempo completo en una página nueva.
+                if (current.root.children.length > 1) nextPage();
+                current.root.append(row);
+                if (pageFits(current.page)) return;
+                row.remove();
+
+                // Un tiempo muy largo se divide entre alimentos, repitiendo sus títulos.
+                const columns = Array.from(row.children);
+                const queues = columns.map(col => {
+                    const children = Array.from(col.children).slice(1);
+                    const units = [];
+                    for (let i = 0; i < children.length; i++) {
+                        if (children[i].classList.contains('menu-dish') && children[i + 1]?.classList.contains('menu-item')) {
+                            const group = document.createElement('div');
+                            group.append(children[i], children[++i]);
+                            units.push(group);
+                        } else units.push(children[i]);
+                    }
+                    return units;
+                });
+                const newSegment = (continuation) => {
+                    const segment = row.cloneNode(false);
+                    columns.forEach(col => {
+                        const target = col.cloneNode(false);
+                        const title = col.querySelector('.menu-time');
+                        if (title) {
+                            const copy = title.cloneNode(true);
+                            if (continuation) copy.append(' (continuación)');
+                            target.append(copy);
+                        }
+                        segment.append(target);
+                    });
+                    current.root.append(segment);
+                    return segment;
+                };
+                let segment = newSegment(false);
+                while (queues.some(queue => queue.length)) {
+                    const candidates = queues.map(queue => queue[0]);
+                    candidates.forEach((unit, i) => { if (unit) segment.children[i].append(unit); });
+                    if (!pageFits(current.page)) {
+                        candidates.forEach(unit => unit?.remove());
+                        const hasContent = Array.from(segment.children).some(col => col.children.length > 1);
+                        if (!hasContent) {
+                            overflow.push({ kind: 'menus', type: 'ingredient', text: candidates.map(unit => unit?.textContent || '').join(' ').trim().slice(0, 120) });
+                            segment.remove();
+                            return;
+                        }
+                        nextPage();
+                        segment = newSegment(true);
+                        continue;
+                    }
+                    queues.forEach(queue => { if (queue.length) queue.shift(); });
+                }
+            });
+        };
+
         const paginateSource = (source) => {
             const kind = source.dataset.pdfFlowPage;
+            if (kind === 'menus') { paginateMenus(source); return; }
             const sourceRoot = source.querySelector(`[data-pdf-flow-root="${kind}"]`);
             if (!sourceRoot) return;
 

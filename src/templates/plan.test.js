@@ -277,7 +277,7 @@ test('conserva somatotipo y energía del plan en antropometría', async () => {
     assert.doesNotMatch(html, /Resultados de Bioimpedancia/);
 });
 
-test('habilita paginación dinámica únicamente en historial y extras', async () => {
+test('habilita paginación dinámica en historial, menús y extras', async () => {
     const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
     const plan = {
         paciente,
@@ -317,6 +317,7 @@ test('habilita paginación dinámica únicamente en historial y extras', async (
     assert.match(html, /data-pdf-flow-page="extras"/);
     assert.match(html, /data-pdf-flow-root="extras"/);
     assert.match(html, /window\.__NORDER_PAGINATE_PDF__/);
-    assert.doesNotMatch(html, /data-pdf-flow-page="menus"/);
+    assert.match(html, /data-pdf-flow-page="menus"/);
+    assert.match(html, /data-pdf-flow-root="menus"/);
     assert.doesNotMatch(html, /data-pdf-flow-page="intercambio"/);
 });

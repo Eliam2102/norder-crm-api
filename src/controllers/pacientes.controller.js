@@ -1,18 +1,12 @@
 import prisma from '../lib/prisma.js';
 import { ok, error } from '../utils/response.js';
+import { buildPacienteSearchFilter } from '../lib/pacienteSearch.js';
 
 export const getAll = async (req, res, next) => {
     try {
         const { buscar, membresia } = req.query;
 
-        const where = {};
-        if (buscar) {
-            where.OR = [
-                { nombre: { contains: buscar, mode: 'insensitive' } },
-                { apellido: { contains: buscar, mode: 'insensitive' } },
-                { telefono: { contains: buscar } }
-            ];
-        }
+        const where = buildPacienteSearchFilter(buscar);
         if (membresia) {
             where.nivelMembresia = membresia;
         }
