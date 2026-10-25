@@ -83,6 +83,7 @@ test('fija las columnas de suplementos y conserva bordes uniformes en filas susp
     assert.match(html, /supl-table supl-table-norder">\s*<colgroup><col style="width:26%"><col style="width:44%"><col style="width:14%"><col style="width:16%">/);
     assert.match(html, /supl-table supl-table-historial">\s*<colgroup><col style="width:28%"><col style="width:54%"><col style="width:18%">/);
     assert.doesNotMatch(html, /\.supl-row-suspended\s*\{[^}]*opacity/);
+    assert.match(html, /\.supl-table-norder th \{ background: #e5e5e5; color: #111; \}/);
 });
 
 const renderClinicalExtras = (bioquimicaTabla, dinamicaDeportivaTabla) => {
