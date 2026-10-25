@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import ejs from 'ejs';
+import { makePlanPdfFixture } from './plan.fixture.js';
 
 const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion, mostrarBioimpedancia = true) => {
     const paciente = { nombre: 'Paciente', apellido: 'Prueba', mostrarBioimpedancia };
@@ -64,6 +65,25 @@ const renderMenus = (menus) => {
         logoMenuImg: null,
     });
 };
+
+test('solo admite tamaños de letra conocidos y usa estándar como valor inicial', async () => {
+    for (const [size, expected] of [[undefined, 11], [11, 11], [12, 12], [13.5, 13.5], [99, 11], ['13.5px; color:red', 11]]) {
+        const fixture = makePlanPdfFixture({ mealCount: 2 });
+        fixture.plan.pdfCustomMeta.menuFontSize = size;
+        const html = await ejs.renderFile(path.resolve('src/templates/plan.ejs'), fixture);
+        assert.ok(html.includes(`--menu-font-size: ${expected}px;`));
+        assert.doesNotMatch(html, /13\.5px; color:red/);
+    }
+});
+
+test('fija las columnas de suplementos y conserva bordes uniformes en filas suspendidas', async () => {
+    const fixture = makePlanPdfFixture({ extras: true });
+    fixture.plan.historialSuplementos = [{ nombre: 'Ejemplo previo', indicaciones: 'Texto de prueba', activo: false, estado: 'Suspendido' }];
+    const html = await ejs.renderFile(path.resolve('src/templates/plan.ejs'), fixture);
+    assert.match(html, /supl-table supl-table-norder">\s*<colgroup><col style="width:26%"><col style="width:44%"><col style="width:14%"><col style="width:16%">/);
+    assert.match(html, /supl-table supl-table-historial">\s*<colgroup><col style="width:28%"><col style="width:54%"><col style="width:18%">/);
+    assert.doesNotMatch(html, /\.supl-row-suspended\s*\{[^}]*opacity/);
+});
 
 const renderClinicalExtras = (bioquimicaTabla, dinamicaDeportivaTabla) => {
     const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
