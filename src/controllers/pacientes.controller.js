@@ -5,6 +5,7 @@ import { buildPacienteSearchFilter } from '../lib/pacienteSearch.js';
 export const getAll = async (req, res, next) => {
     try {
         const { buscar, membresia } = req.query;
+        const resumen = req.query.resumen === 'true';
 
         const where = buildPacienteSearchFilter(buscar);
         if (membresia) {
@@ -13,7 +14,25 @@ export const getAll = async (req, res, next) => {
 
         const pacientes = await prisma.paciente.findMany({
             where,
-            include: {
+            ...(resumen ? { select: {
+                id: true, nombre: true, apellido: true, telefono: true,
+                valoraciones: {
+                    where: { deletedAt: null },
+                    orderBy: [{ fecha: 'desc' }, { numeroValoracion: 'desc' }],
+                    select: {
+                        id: true, fecha: true, numeroValoracion: true, updatedAt: true,
+                        barrido: { select: { id: true, kcalTotal: true, porciones: true } },
+                        citas: { select: { id: true, fecha: true } }
+                    }
+                },
+                planes: {
+                    orderBy: { fechaCreacion: 'desc' },
+                    select: {
+                        id: true, valoracionId: true, estadoEnvio: true,
+                        fechaCreacion: true, updatedAt: true, proximaSesion: true
+                    }
+                }
+            } } : { include: {
                 valoraciones: {
                     where: { deletedAt: null },
                     orderBy: [
@@ -28,7 +47,7 @@ export const getAll = async (req, res, next) => {
                 planes: {
                     orderBy: { fechaCreacion: 'desc' }
                 }
-            },
+            } }),
             orderBy: { nombre: 'asc' }
         });
 
@@ -58,8 +77,9 @@ export const getAll = async (req, res, next) => {
                     estadoFlujo = 'Listo para enviar';
                 }
 
+                const { barrido, citas, ...datosResumen } = v;
                 return {
-                    ...v,
+                    ...(resumen ? datosResumen : v),
                     hasBarrido,
                     estadoFlujo,
                     planId: planAsociado?.id || null,

@@ -19,6 +19,8 @@ services:
       - backend
 
   api:
+    # El arranque de producción no debe ejecutar migraciones automáticamente.
+    command: ["node", "server.js"]
     build:
       context: ..
       dockerfile: Dockerfile
