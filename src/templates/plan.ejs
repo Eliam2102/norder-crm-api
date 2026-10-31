@@ -465,7 +465,7 @@
         ? hist[hist.length - 1]
         : null;
     const hasBioimpedancia = hist.some(v =>
-        v && (
+        v && v.medicionesEstado?.mostrarBioimpedancia !== false && (
             v.metodoComposicion === 'BIOIMPEDANCIA'
             || v.bioGrasa != null
             || v.bioAgua != null
@@ -563,23 +563,23 @@
                         <td class="font-bold">Talla (cm)</td>
                         <% cols.forEach(c => { %><td><%= measurementText(c, 'estatura', c?.estatura) %></td><% }); %>
                     </tr>
-                    <% if (paciente.mostrarBioimpedancia !== false && (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia))) { %>
+                    <% if (plan.mostrarBioimpedancia !== false && (plan.metodoComposicion === 'BIOIMPEDANCIA' || (!plan.metodoComposicion && hasBioimpedancia))) { %>
                         <tr><td colspan="8" class="font-bold text-center">Resultados de Bioimpedancia</td></tr>
                         <tr>
                             <td class="font-bold">Grasa (%)</td>
-                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioGrasa) : '' %></td><% }); %>
+                            <% cols.forEach(c => { %><td><%= c && c.medicionesEstado?.mostrarBioimpedancia !== false ? formatMeasurementNumber(c.bioGrasa) : '' %></td><% }); %>
                         </tr>
                         <tr>
                             <td class="font-bold">Agua (%)</td>
-                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioAgua) : '' %></td><% }); %>
+                            <% cols.forEach(c => { %><td><%= c && c.medicionesEstado?.mostrarBioimpedancia !== false ? formatMeasurementNumber(c.bioAgua) : '' %></td><% }); %>
                         </tr>
                         <tr>
                             <td class="font-bold">Músculo (kg)</td>
-                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioMusculo) : '' %></td><% }); %>
+                            <% cols.forEach(c => { %><td><%= c && c.medicionesEstado?.mostrarBioimpedancia !== false ? formatMeasurementNumber(c.bioMusculo) : '' %></td><% }); %>
                         </tr>
                         <tr>
                             <td class="font-bold">Energía bio (kcal)</td>
-                            <% cols.forEach(c => { %><td><%= c ? formatMeasurementNumber(c.bioEnergia) : '' %></td><% }); %>
+                            <% cols.forEach(c => { %><td><%= c && c.medicionesEstado?.mostrarBioimpedancia !== false ? formatMeasurementNumber(c.bioEnergia) : '' %></td><% }); %>
                         </tr>
                     <% } else { %>
                         <tr><td colspan="8" class="font-bold text-center">Resultados Antropométricos</td></tr>

@@ -609,6 +609,7 @@ export const enrichPlanForPdf = async (plan, metaOverride = null) => {
             || rawValoraciones[0]
             || null
         );
+        plan.mostrarBioimpedancia = valoracionReferencia?.medicionesEstado?.mostrarBioimpedancia !== false;
         plan.consultaEnLinea = valoracionReferencia?.medicionesEstado?.consultaEnLinea === true;
         plan.metodoComposicion = plan.consultaEnLinea
             ? 'FOTOSCOPIA'

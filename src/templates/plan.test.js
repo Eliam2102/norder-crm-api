@@ -5,11 +5,12 @@ import ejs from 'ejs';
 import { makePlanPdfFixture } from './plan.fixture.js';
 
 const renderHistory = (valoraciones, consultaEnLinea = false, metodoComposicion, mostrarBioimpedancia = true) => {
-    const paciente = { nombre: 'Paciente', apellido: 'Prueba', mostrarBioimpedancia };
+    const paciente = { nombre: 'Paciente', apellido: 'Prueba' };
     const plan = {
         paciente,
         consultaEnLinea,
         metodoComposicion,
+        mostrarBioimpedancia,
         menus: [],
         evitarReciente: [],
         lineamientosRecientes: [],
@@ -268,7 +269,7 @@ test('incluye las cuatro filas de bioimpedancia sólo cuando existen resultados'
     assert.doesNotMatch(html, /Mesomorfo/);
 });
 
-test('oculta bioimpedancia en el PDF cuando el expediente la tiene desactivada', async () => {
+test('oculta bioimpedancia en el PDF solo cuando la valoración la tiene desactivada', async () => {
     const html = await renderHistory([{
         id: 'valoracion-1',
         fecha: new Date('2026-07-27T12:00:00Z'),
@@ -341,4 +342,25 @@ test('habilita paginación dinámica en historial, menús y extras', async () =>
     assert.match(html, /data-pdf-flow-page="menus"/);
     assert.match(html, /data-pdf-flow-root="menus"/);
     assert.doesNotMatch(html, /data-pdf-flow-page="intercambio"/);
+});
+
+
+test('una valoración con bioimpedancia oculta no aporta resultados al histórico de otra consulta', async () => {
+    const html = await renderHistory([
+        { id: 'nueva', fecha: new Date('2026-10-31T12:00:00Z'), bioGrasa: 25.7, bioAgua: 51.2 },
+        { id: 'anterior', fecha: new Date('2026-09-03T12:00:00Z'), bioGrasa: 24.3, bioAgua: 52.1,
+          medicionesEstado: { mostrarBioimpedancia: false } },
+    ], false, 'BIOIMPEDANCIA');
+    assert.match(html, /Resultados de Bioimpedancia/);
+    assert.match(html, />25\.7</);
+    assert.doesNotMatch(html, />24\.3<|>52\.1</);
+});
+
+
+test('no hereda la ocultación de una valoración anterior cuando el plan no declara método', async () => {
+    const html = await renderHistory([{
+        id: 'anterior', fecha: new Date('2026-09-03T12:00:00Z'), bioGrasa: 24.3,
+        medicionesEstado: { mostrarBioimpedancia: false },
+    }]);
+    assert.doesNotMatch(html, /Resultados de Bioimpedancia/);
 });
